@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador WhatsApp | Lubri Expert Bot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: #111b21;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .device-container {
+      width: 100%;
+      max-width: 480px;
+      height: 92vh;
+      max-height: 840px;
+      background: #0b141a;
+      border-radius: 28px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      position: relative;
+    }
+
+    /* WhatsApp Header */
+    .chat-header {
+      background: #202c33;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      z-index: 10;
+    }
+
+    .avatar-wrap {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00a884, #005c4b);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      flex-shrink: 0;
+    }
+
+    .online-badge {
+      width: 11px;
+      height: 11px;
+      background: #25d366;
+      border: 2px solid #202c33;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      right: 0;
+    }
+
+    .chat-title-group {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .chat-name {
+      color: #e9edef;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .verified-icon {
+      color: #00a884;
+      font-size: 14px;
+    }
+
+    .chat-status {
+      color: #8696a0;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #8696a0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    /* Banner de Alerta Handoff */
+    .handoff-banner {
+      background: #991b1b;
+      color: #fef2f2;
+      font-size: 12px;
+      padding: 8px 14px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      animation: fadeIn 0.3s;
+    }
+
+    .handoff-banner.active {
+      display: flex;
+    }
+
+    .handoff-banner button {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    /* Mensajes */
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background-color: #0b141a;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    .message-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 82%;
+      animation: slideUp 0.2s ease-out;
+    }
+
+    .message-row.incoming {
+      align-self: flex-start;
+    }
+
+    .message-row.outgoing {
+      align-self: flex-end;
+    }
+
+    .bubble {
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 13.8px;
+      line-height: 1.45;
+      position: relative;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .incoming .bubble {
+      background: #202c33;
+      color: #e9edef;
+      border-top-left-radius: 2px;
+    }
+
+    .outgoing .bubble {
+      background: #005c4b;
+      color: #e9edef;
+      border-top-right-radius: 2px;
+    }
+
+    .time-stamp {
+      font-size: 10.5px;
+      color: #8696a0;
+      float: right;
+      margin-left: 12px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .outgoing .time-stamp {
+      color: #8696a0;
+    }
+
+    .checks {
+      color: #53bdeb;
+      font-size: 11px;
+    }
+
+    /* Quick suggestions */
+    .quick-chips {
+      padding: 8px 12px;
+      background: #111b21;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      scrollbar-width: none;
+    }
+    .quick-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      background: #202c33;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #aebac1;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .chip:hover {
+      background: #00a884;
+      color: white;
+      border-color: #00a884;
+    }
+
+    /* Input Footer */
+    .chat-footer {
+      background: #202c33;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: #2a3942;
+      border: none;
+      outline: none;
+      padding: 10px 14px;
+      border-radius: 20px;
+      color: #d1d7db;
+      font-size: 14px;
+    }
+
+    .chat-input::placeholder {
+      color: #8696a0;
+    }
+
+    .btn-send {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #00a884;
+      border: none;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-send:hover {
+      background: #06cf9c;
+    }
+
+    .typing-indicator {
+      display: none;
+      align-self: flex-start;
+      background: #202c33;
+      color: #8696a0;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    .typing-indicator.active {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="device-container">
+    <!-- Header -->
+    <div class="chat-header">
+      <div class="avatar-wrap">
+        🛢️
+        <div class="online-badge"></div>
+      </div>
+      <div class="chat-title-group">
+        <div class="chat-name">
+          Lubri Expert
+          <span class="verified-icon">✓</span>
+        </div>
+        <div class="chat-status" id="chatStatus">en línea • Serviteca Palmira</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-reset" title="Restablecer chat y memoria" onclick="resetChat()">🔄 Reset</button>
+      </div>
+    </div>
+
+    <!-- Handoff Banner -->
+    <div class="handoff-banner" id="handoffBanner">
+      <span>🚨 Chat transferido a Asesor Humano (+57 310 465 4686)</span>
+      <button onclick="resumeBot()">Reactivar Bot</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="chat-messages" id="messagesContainer">
+      <div class="message-row incoming">
+        <div class="bubble">
+¡Hola! 👋 Bienvenido a *Lubri Expert* (by Cerón Zapata), tu centro de servicio y lubricación express en Palmira. 🚗💨
+
+¿En qué podemos ayudarte hoy?
+• 🛢️ *Cambio de aceite y filtros*
+• 🛞 *Llantas, alineación y balanceo*
+• 🔌 *Escáner automotriz computarizado*
+• 🕒 *Horarios y ubicación*
+• 👨‍🔧 *Hablar con un asesor*
+          <span class="time-stamp" id="initialTime">--:--</span>
+        </div>
+      </div>
+
+      <div class="typing-indicator" id="typingIndicator">
+        <span>Experto Lubri está escribiendo...</span>
+      </div>
+    </div>
+
+    <!-- Quick suggestions -->
+    <div class="quick-chips">
+      <button class="chip" onclick="sendQuick('¿Qué horarios tienen en Palmira?')">🕒 Horarios</button>
+      <button class="chip" onclick="sendQuick('¿Dónde queda ubicada la serviteca?')">📍 Ubicación</button>
+      <button class="chip" onclick="sendQuick('Quiero saber qué aceite le sirve a mi carro')">🛢️ Recomendar Aceite</button>
+      <button class="chip" onclick="sendQuick('¿Tienen servicio de escáner para testigo Check Engine?')">🔌 Escáner</button>
+      <button class="chip" onclick="sendQuick('Quiero hablar con un asesor humano')">👨‍🔧 Asesor Humano</button>
+    </div>
+
+    <!-- Input -->
+    <div class="chat-footer">
+      <input type="text" class="chat-input" id="messageInput" placeholder="Escribe un mensaje aquí..." onkeypress="handleKey(event)" autofocus>
+      <button class="btn-send" onclick="sendMessage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const customerPhone = '573109998877';
+    const container = document.getElementById('messagesContainer');
+    const input = document.getElementById('messageInput');
+    const typing = document.getElementById('typingIndicator');
+    const handoffBanner = document.getElementById('handoffBanner');
+    const chatStatus = document.getElementById('chatStatus');
+
+    document.getElementById('initialTime').innerText = getCurrentTime();
+
+    function getCurrentTime() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatWhatsAppMarkdown(text) {
+      if (!text) return '';
+      // Escape HTML
+      let escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Convert *bold* to <strong>
+      escaped = escaped.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+      // Convert _italic_ to <em>
+      escaped = escaped.replace(/_(.*?)_/g, '<em>$1</em>');
+      return escaped;
+    }
+
+    function appendMessage(sender, text) {
+      const row = document.createElement('div');
+      row.className = `message-row ${sender === 'user' ? 'outgoing' : 'incoming'}`;
+      
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.innerHTML = formatWhatsAppMarkdown(text) + 
+        `<span class="time-stamp">${getCurrentTime()} ${sender === 'user' ? '<span class="checks">✓✓</span>' : ''}</span>`;
+
+      row.appendChild(bubble);
+      container.insertBefore(row, typing);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage('user', text);
+      input.value = '';
+
+      typing.classList.add('active');
+      container.scrollTop = container.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: customerPhone, message: text })
+        });
+
+        const data = await res.json();
+        typing.classList.remove('active');
+
+        if (data.reply) {
+          appendMessage('bot', data.reply);
+        }
+
+        if (data.isHandoff) {
+          handoffBanner.classList.add('active');
+          chatStatus.innerText = '👨‍🔧 Asesor Humano a cargo (+57 310 465 4686)';
+        }
+      } catch (err) {
+        typing.classList.remove('active');
+        appendMessage('bot', '⚠️ Error de conexión con el bot. Por favor revisa que el servidor esté activo.');
+      }
+    }
+
+    function sendQuick(text) {
+      input.value = text;
+      sendMessage();
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    }
+
+    async function resetChat() {
+      if (!confirm('¿Deseas reiniciar la sesión y borrar la memoria del chat?')) return;
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: customerPhone })
+      });
+      location.reload();
+    }
+
+    async function resumeBot() {
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: customerPhone })
+      });
+      handoffBanner.classList.remove('active');
+      chatStatus.innerText = 'en línea • Serviteca Palmira';
+      appendMessage('bot', '✅ *El bot de Lubri Expert ha sido reactivado.* ¿En qué más te podemos ayudar?');
+    }
+  </script>
+</body>
+</html>
