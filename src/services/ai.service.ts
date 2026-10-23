@@ -5,9 +5,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+const getOpenAIClient = () => {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey.trim().length === 0) return null;
+  return new OpenAI({ apiKey });
+};
 
 const knowledgeBasePath = path.join(process.cwd(), 'knowledge_base.md');
 
@@ -70,8 +72,8 @@ interface ChatMessage {
 const conversations: Record<string, ChatMessage[]> = {};
 
 export const getAiResponse = async (message: string, phone: string): Promise<string> => {
-  // Si no hay API key de OpenAI, usar respuestas inteligentes basadas en la base de conocimiento
-  if (!process.env.OPENAI_API_KEY) {
+  const openai = getOpenAIClient();
+  if (!openai) {
     return handleKnowledgeFallback(message);
   }
 
@@ -112,7 +114,8 @@ export const getAiResponse = async (message: string, phone: string): Promise<str
 };
 
 export const transcribeAudio = async (filePath: string): Promise<string | null> => {
-  if (!process.env.OPENAI_API_KEY) return null;
+  const openai = getOpenAIClient();
+  if (!openai) return null;
 
   try {
     const transcription = await openai.audio.transcriptions.create({

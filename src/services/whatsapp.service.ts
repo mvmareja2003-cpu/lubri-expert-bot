@@ -9,6 +9,9 @@ export let sock: any = null;
 
 export const initWhatsAppClient = async (onMessageReceived: (msg: any) => Promise<void>) => {
     const authDir = path.join(process.cwd(), 'baileys_auth_info');
+    if (!fs.existsSync(authDir)) {
+        fs.mkdirSync(authDir, { recursive: true });
+    }
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
     sock = makeWASocket({
