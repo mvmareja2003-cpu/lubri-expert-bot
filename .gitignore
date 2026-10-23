@@ -4,3 +4,4 @@ dist/
 baileys_auth_info/
 *.log
 .DS_Store
+ipv6_proxy.js
