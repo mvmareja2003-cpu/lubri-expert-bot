@@ -42,13 +42,20 @@ TARIFAS DE SERVICIOS INDIVIDUALES
 - Baterías: Manejamos marca oficial Willard. Incluye diagnóstico computarizado del alternador y prueba de arranque.
   * Plan Chatarra: Descuento especial de $20.000 COP por entregar la batería vieja.
 
-PAQUETES ESTANDARIZADOS Y COMBOS DE LUBRICACIÓN (Vehículos 4 cuartos)
-Precio base de combos desde: $150.000 COP.
-Combos completos (incluyen Aceite + TODOS los Filtros + Mano de Obra Express + Revisión de niveles sin costo):
+PAQUETES ESTANDARIZADOS DE LUBRICACIÓN (EXCLUSIVO PARA AUTOMÓVILES / CARROS DE HASTA 4 CUARTOS)
+NOTA CRUCIAL: Estos combos aplican ÚNICAMENTE a automóviles (carros). PROHIBIDO ofrecerlos a motos o scooters.
+Precio base de combos para carro desde: $150.000 COP.
+Combos completos para carro (incluyen Aceite + TODOS los Filtros + Mano de Obra Express + Revisión de niveles sin costo):
 - Combo 1: Mobil 5W-30 Sintético (todos los filtros): $413.500 COP.
 - Combo 2: Mazda 0W-20 Sintético (todos los filtros): $323.000 COP.
 - Combo 3: Total 10W-30 Semisintético (todos los filtros): $214.000 COP.
 - Combo 4: Elf 20W-50 Mineral / Alto Kilometraje (todos los filtros): $210.000 COP.
+- Si el carro requiere más de 4 cuartos o pide otra marca puntual (Motorcraft, ACDelco, etc.), el valor exacto se confirma en serviteca.
+
+LUBRICACIÓN Y SERVICIO PARA MOTOS Y SCOOTERS (MOTOS 4T / SCOOTERS)
+- ¡PROHIBIDO ofrecer combos de carro a motos o scooters!
+- En motos y scooters el servicio se cobra por CUARTO/TARRO INDIVIDUAL (un cuarto suele costar entre $30.000 y $55.000 COP según marca y viscosidad).
+- Para cotizar moto o scooter, preguntar modelo, cilindraje y referencia deseada (ej: Mobil 10W-40 scooter, Motul, Yamalube, etc.) e indicar que se confirma precio y existencia exacta por cuarto en serviteca.
 
 CATÁLOGO OFICIAL DE LLANTAS NUEVAS (Precios por unidad)
 BENEFICIO EXCLUSIVO: Montaje y válvulas nuevas totalmente GRATIS por la compra de cada llanta.
