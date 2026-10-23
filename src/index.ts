@@ -23,7 +23,7 @@ if (fs.existsSync(publicPath)) {
 
 // Variables de control de toma de control humana (Takeover)
 const humanTakeover: Record<string, number> = {};
-const TAKEOVER_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos de pausa
+const TAKEOVER_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos de pausa (evita que el bot se quede pegado)
 const lastImageReply: Record<string, number> = {};
 
 // Endpoint para el simulador web o pruebas locales
@@ -96,24 +96,28 @@ const handleMessage = async (msg: any) => {
                             msg.message?.imageMessage?.caption || 
                             msg.message?.videoMessage?.caption || '';
 
-        // Si el humano responde desde el celular o WhatsApp Web, pausar el bot por 30 mins
+        // Si el cliente envía palabras de saludo o reinicio, reactivar de inmediato
+        const cleanText = textMessage.toLowerCase().trim();
+        const isReactivateCmd = ['bot', 'activar', 'hola', 'menu', 'buenos dias', 'buenas tardes', 'reiniciar', 'cotizar', 'informacion', 'buena'].some(k => cleanText.includes(k));
+
+        // Si el humano responde desde el celular o WhatsApp Web, pausar el bot por 5 mins
         if (fromMe) {
             if (textMessage.trim().length > 0) {
-                console.log(`[PAUSA] Asesor humano respondió en el chat con ${phoneNumber}. Bot silenciado 30 mins.`);
+                console.log(`[PAUSA] Asesor humano respondió en el chat con ${phoneNumber}. Bot silenciado 5 mins.`);
                 humanTakeover[from] = Date.now();
             }
             return;
         }
 
-        // Si el chat está en manos de un asesor humano, respetar el silencio
+        // Si el chat está en manos de un asesor humano, respetar silencio temporal salvo reactivación o tras 3 mins
         if (humanTakeover[from]) {
             const elapsed = Date.now() - humanTakeover[from];
-            if (elapsed < TAKEOVER_TIMEOUT_MS) {
-                console.log(`[SILENCIO] Chat con ${phoneNumber} está siendo atendido por un asesor humano.`);
-                return;
-            } else {
+            if (isReactivateCmd || elapsed > 3 * 60 * 1000) {
                 delete humanTakeover[from];
                 console.log(`[REACTIVADO] Bot reactivado automáticamente para ${phoneNumber}.`);
+            } else {
+                console.log(`[SILENCIO] Chat con ${phoneNumber} está siendo atendido por un asesor humano (${Math.round((TAKEOVER_TIMEOUT_MS - elapsed)/1000)}s restantes).`);
+                return;
             }
         }
 

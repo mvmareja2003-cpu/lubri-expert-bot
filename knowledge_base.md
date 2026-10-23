@@ -13,17 +13,23 @@ INFORMACIÓN GENERAL Y UBICACIÓN
 
 HORARIOS Y CAPACIDAD OPERATIVA
 - Horarios de atención:
-  * Lunes a Viernes: 7:00 a.m. a 5:00 p.m. (Jornada continua)
-  * Sábados: 7:00 a.m. a 4:30 p.m. (Jornada continua)
-  * Domingos: 7:30 a.m. a 12:30 p.m. (Jornada de la mañana)
+  * Lunes a Viernes: 7:00 a.m. a 5:00 p.m. (Última cita disponible: 4:15 p.m.)
+  * Sábados: 7:00 a.m. a 4:30 p.m. (Última cita disponible: 3:45 p.m.)
+  * Domingos: 7:30 a.m. a 12:30 p.m. (Última cita disponible: 11:45 a.m.)
   * Festivos: Consultar disponibilidad previa por este canal.
+- REGLA ESTRICTA DE DOMINGOS (¡CERO MECÁNICA NI FRENOS!):
+  * Los domingos ÚNICAMENTE se realizan cambios de aceite express, lubricación, revisión de niveles y venta rápida.
+  * Los domingos NO se realiza mecánica, NO se cambian pastillas de freno, NO se hace suspensión ni alineación.
+  * Cualquier servicio de frenos, pastillas o mecánica se agenda exclusivamente de Lunes a Sábado.
+- REGLA DE AGENDAMIENTO DE CITAS:
+  * NUNCA agendar citas a la hora exacta de cierre (ejemplo: NUNCA a las 4:30 pm un sábado ni a las 5:00 pm entre semana porque a esa hora el taller cierra). Toda cita debe agendarse con mínimo 30 a 45 minutos de anticipación al cierre.
 - Capacidad física: 4 bahías de servicio y 1 elevador hidráulico.
 - Horarios pico (mayor afluencia): 11:00 am y 3:00 pm.
 - Horario valle (ideal para atención express sin fila): 12:00 m a 2:00 pm.
 - Tiempos de servicio:
   * Cambio de aceite express: 15 a 20 minutos.
   * Escaneo computarizado OBD-II: 15 minutos.
-  * Alineación 3D y balanceo: 45 minutos.
+  * Alineación 3D y balanceo: 45 minutos (Lunes a Sábado únicamente).
 
 TARIFAS DE SERVICIOS INDIVIDUALES
 - Alineación 3D y Balanceo computarizado: $120.000 COP (las 4 ruedas).
