@@ -151,8 +151,8 @@ const handleMessage = async (msg: any) => {
             if (lastImageReply[phoneNumber] && (now - lastImageReply[phoneNumber] < 60000)) return;
             lastImageReply[phoneNumber] = now;
 
-            const ownerPhone = process.env.OWNER_PHONE || '573104654686';
-            const alertMsg = `🚨 *¡ALERTA DE ATENCIÓN / FOTO RECIBIDA EN LUBRI EXPERT!* 🚨\n\nEl cliente +${phoneNumber} acaba de enviar una imagen o documento (tarjeta de propiedad, daño o comprobante). Revisa el chat para atenderlo.`;
+            const ownerPhone = process.env.OWNER_PHONE || '573016593654';
+            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n📄 *Motivo:* Envió una foto o documento (tarjeta de propiedad, daño o comprobante).\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
             await sendWhatsAppMessage(ownerPhone, alertMsg);
 
             await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
@@ -172,8 +172,8 @@ const handleMessage = async (msg: any) => {
         // Verificar si la IA activó traspaso a humano
         if (aiResponse.includes('[ESCALAR_HUMANO]')) {
             aiResponse = aiResponse.replace('[ESCALAR_HUMANO]', '').trim();
-            const ownerPhone = process.env.OWNER_PHONE || '573104654686';
-            const alertMsg = `🚨 *¡ALERTA DE ATENCIÓN HUMANA EN LUBRI EXPERT!* 🚨\n\nEl cliente +${phoneNumber} solicitó asesor o cotización especializada.\nÚltimo mensaje del cliente: "${msgBody}"\nPor favor atiende el chat.`;
+            const ownerPhone = process.env.OWNER_PHONE || '573016593654';
+            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n💬 *Último mensaje:* "${msgBody}"\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
             
             await sendWhatsAppMessage(ownerPhone, alertMsg);
             humanTakeover[from] = Date.now();
