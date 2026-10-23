@@ -21,9 +21,8 @@ if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
 }
 
-// Variables de control de toma de control humana (Takeover)
 const humanTakeover: Record<string, number> = {};
-const TAKEOVER_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos de pausa (evita que el bot se quede pegado)
+const TAKEOVER_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de pausa para atención humana
 const lastImageReply: Record<string, number> = {};
 
 // Endpoint para el simulador web o pruebas locales
@@ -100,23 +99,23 @@ const handleMessage = async (msg: any) => {
         const cleanText = textMessage.toLowerCase().trim();
         const isReactivateCmd = ['bot', 'activar', 'hola', 'menu', 'buenos dias', 'buenas tardes', 'reiniciar', 'cotizar', 'informacion', 'buena'].some(k => cleanText.includes(k));
 
-        // Si el humano responde desde el celular o WhatsApp Web, pausar el bot por 5 mins
+        // Si el humano responde desde el celular o WhatsApp Web, pausar el bot por 15 mins
         if (fromMe) {
             if (textMessage.trim().length > 0) {
-                console.log(`[PAUSA] Asesor humano respondió en el chat con ${phoneNumber}. Bot silenciado 5 mins.`);
+                console.log(`[PAUSA] Asesor humano respondió en el chat con ${phoneNumber}. Bot silenciado 15 mins.`);
                 humanTakeover[from] = Date.now();
             }
             return;
         }
 
-        // Si el chat está en manos de un asesor humano, respetar silencio temporal salvo reactivación o tras 3 mins
+        // Si el chat está en manos de un asesor humano, respetar silencio estricto de 15 minutos
         if (humanTakeover[from]) {
             const elapsed = Date.now() - humanTakeover[from];
-            if (isReactivateCmd || elapsed > 3 * 60 * 1000) {
+            if (cleanText === 'activar bot' || cleanText === 'reiniciar bot' || elapsed >= TAKEOVER_TIMEOUT_MS) {
                 delete humanTakeover[from];
-                console.log(`[REACTIVADO] Bot reactivado automáticamente para ${phoneNumber}.`);
+                console.log(`[REACTIVADO] Bot reactivado automáticamente para ${phoneNumber} (cumplidos los 15 minutos).`);
             } else {
-                console.log(`[SILENCIO] Chat con ${phoneNumber} está siendo atendido por un asesor humano (${Math.round((TAKEOVER_TIMEOUT_MS - elapsed)/1000)}s restantes).`);
+                console.log(`[SILENCIO] Chat con ${phoneNumber} está siendo atendido por un asesor humano (${Math.round((TAKEOVER_TIMEOUT_MS - elapsed)/1000)}s restantes de los 15 mins).`);
                 return;
             }
         }
