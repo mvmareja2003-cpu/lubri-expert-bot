@@ -16,25 +16,47 @@
     }
 
     body {
-      background: #111b21;
+      background: #0f172a;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       padding: 16px;
     }
 
+    /* Banner superior para los dueños */
+    .owner-helper {
+      max-width: 480px;
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      color: #94a3b8;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .owner-helper strong {
+      color: #38bdf8;
+    }
+
     .device-container {
       width: 100%;
       max-width: 480px;
-      height: 92vh;
+      height: 90vh;
       max-height: 840px;
       background: #0b141a;
       border-radius: 28px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
       position: relative;
     }
 
@@ -220,14 +242,26 @@
     }
 
     /* Quick suggestions */
-    .quick-chips {
-      padding: 8px 12px;
+    .quick-chips-wrapper {
       background: #111b21;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 8px 12px;
+    }
+
+    .quick-chips-title {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .quick-chips {
       display: flex;
       gap: 6px;
       overflow-x: auto;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
       scrollbar-width: none;
+      padding-bottom: 2px;
     }
     .quick-chips::-webkit-scrollbar {
       display: none;
@@ -323,6 +357,12 @@
 </head>
 <body>
 
+  <!-- Mensaje de ayuda para los dueños -->
+  <div class="owner-helper">
+    <span>💡 <strong>Modo Prueba Dueños:</strong> Chatea como si fueras un cliente.</span>
+    <span>Sede: <strong>Carrera 34C Palmira</strong></span>
+  </div>
+
   <div class="device-container">
     <!-- Header -->
     <div class="chat-header">
@@ -352,35 +392,33 @@
     <div class="chat-messages" id="messagesContainer">
       <div class="message-row incoming">
         <div class="bubble">
-¡Hola! 👋 Bienvenido a *Lubri Expert* (by Cerón Zapata), tu centro de servicio y lubricación express en Palmira. 🚗💨
-
-¿En qué podemos ayudarte hoy?
-• 🛢️ *Cambio de aceite y filtros*
-• 🛞 *Llantas, alineación y balanceo*
-• 🔌 *Escáner automotriz computarizado*
-• 🕒 *Horarios y ubicación*
-• 👨‍🔧 *Hablar con un asesor*
+¡Hola! Bienvenido a Lubri Expert Palmira 🚗 ¿En qué te podemos colaborar hoy? ¿Buscas cambio de aceite, llantas, alineación o escáner?
           <span class="time-stamp" id="initialTime">--:--</span>
         </div>
       </div>
 
       <div class="typing-indicator" id="typingIndicator">
-        <span>Experto Lubri está escribiendo...</span>
+        <span>Andrés (Lubri Expert) está escribiendo...</span>
       </div>
     </div>
 
     <!-- Quick suggestions -->
-    <div class="quick-chips">
-      <button class="chip" onclick="sendQuick('¿Qué horarios tienen en Palmira?')">🕒 Horarios</button>
-      <button class="chip" onclick="sendQuick('¿Dónde queda ubicada la serviteca?')">📍 Ubicación</button>
-      <button class="chip" onclick="sendQuick('Quiero saber qué aceite le sirve a mi carro')">🛢️ Recomendar Aceite</button>
-      <button class="chip" onclick="sendQuick('¿Tienen servicio de escáner para testigo Check Engine?')">🔌 Escáner</button>
-      <button class="chip" onclick="sendQuick('Quiero hablar con un asesor humano')">👨‍🔧 Asesor Humano</button>
+    <div class="quick-chips-wrapper">
+      <div class="quick-chips-title">Preguntas de prueba rápida para los dueños:</div>
+      <div class="quick-chips">
+        <button class="chip" onclick="sendQuick('¿Qué combos tienen de cambio de aceite y qué precio tienen?')">🛢️ Combos Aceite</button>
+        <button class="chip" onclick="sendQuick('¿Qué precio tienen las llantas 185/65 R15?')">🛞 Llantas 185/65 R15</button>
+        <button class="chip" onclick="sendQuick('¿Cuánto cuesta la alineación 3D y el balanceo?')">🚗 Alineación 3D</button>
+        <button class="chip" onclick="sendQuick('¿Tienen baterías Willard y cuánto descuentan por la vieja?')">🔋 Baterías Willard</button>
+        <button class="chip" onclick="sendQuick('¿Cuánto cuesta el escáner para borrar un testigo de motor?')">🔌 Escáner OBD-II</button>
+        <button class="chip" onclick="sendQuick('¿A qué hora tienen menos fila para ir?')">🕒 Horario Valle</button>
+        <button class="chip" onclick="sendQuick('Quiero hablar con un asesor humano')">👨‍🔧 Hablar con Asesor</button>
+      </div>
     </div>
 
     <!-- Input -->
     <div class="chat-footer">
-      <input type="text" class="chat-input" id="messageInput" placeholder="Escribe un mensaje aquí..." onkeypress="handleKey(event)" autofocus>
+      <input type="text" class="chat-input" id="messageInput" placeholder="Escribe como un cliente..." onkeypress="handleKey(event)" autofocus>
       <button class="btn-send" onclick="sendMessage()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -407,15 +445,12 @@
 
     function formatWhatsAppMarkdown(text) {
       if (!text) return '';
-      // Escape HTML
       let escaped = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-      // Convert *bold* to <strong>
       escaped = escaped.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
-      // Convert _italic_ to <em>
       escaped = escaped.replace(/_(.*?)_/g, '<em>$1</em>');
       return escaped;
     }
@@ -464,7 +499,7 @@
         }
       } catch (err) {
         typing.classList.remove('active');
-        appendMessage('bot', '⚠️ Error de conexión con el bot. Por favor revisa que el servidor esté activo.');
+        appendMessage('bot', '⚠️ Error de conexión con el bot. Por favor asegúrate de que el servidor esté activo.');
       }
     }
 
@@ -497,7 +532,7 @@
       });
       handoffBanner.classList.remove('active');
       chatStatus.innerText = 'en línea • Serviteca Palmira';
-      appendMessage('bot', '✅ *El bot de Lubri Expert ha sido reactivado.* ¿En qué más te podemos ayudar?');
+      appendMessage('bot', '✅ El bot de Lubri Expert ha sido reactivado. ¿En qué más te podemos colaborar?');
     }
   </script>
 </body>
