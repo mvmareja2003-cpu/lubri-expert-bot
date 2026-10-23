@@ -429,7 +429,13 @@
   </div>
 
   <script>
-    const customerPhone = '573109998877';
+    // Identificador único por dispositivo para que varios dueños prueben al mismo tiempo sin cruzar conversaciones
+    let customerPhone = localStorage.getItem('lubri_test_phone');
+    if (!customerPhone) {
+      customerPhone = '573' + Math.floor(100000000 + Math.random() * 900000000);
+      localStorage.setItem('lubri_test_phone', customerPhone);
+    }
+
     const container = document.getElementById('messagesContainer');
     const input = document.getElementById('messageInput');
     const typing = document.getElementById('typingIndicator');
