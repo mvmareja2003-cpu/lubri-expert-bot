@@ -35,7 +35,14 @@ app.post('/api/chat', async (req, res) => {
             return;
         }
 
-        let aiReply = await getAiResponse(message, phoneNumber);
+        const activeTicket = quotesService.getActiveCustomerTicket(`${phoneNumber}@s.whatsapp.net`, phoneNumber);
+        let ticketContext: string | undefined = undefined;
+        if (activeTicket && activeTicket.status === 'QUOTED') {
+            ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
+                (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
+        }
+
+        let aiReply = await getAiResponse(message, phoneNumber, ticketContext);
         const isHandoff = aiReply.includes('[ESCALAR_HUMANO]');
         if (isHandoff) {
             aiReply = aiReply.replace('[ESCALAR_HUMANO]', '').trim();
@@ -204,8 +211,17 @@ const handleMessage = async (msg: any) => {
 
         console.log(`[MENSAJE] De +${phoneNumber}: "${textMessage}"`);
 
+        // Obtener ticket activo reciente para inyectar contexto si existe
+        const activeTicket = quotesService.getActiveCustomerTicket(from, phoneNumber);
+        let ticketContext: string | undefined = undefined;
+
+        if (activeTicket && activeTicket.status === 'QUOTED') {
+            ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
+                (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
+        }
+
         // Obtener respuesta de la IA
-        let aiResponse = await getAiResponse(textMessage, phoneNumber);
+        let aiResponse = await getAiResponse(textMessage, phoneNumber, ticketContext);
 
         // Verificar si la IA generó una solicitud de cotización para Arias el técnico
         const quoteMatch = aiResponse.match(/\[SOLICITAR_COTIZACION:\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\]]+)\]/i);
@@ -219,7 +235,6 @@ const handleMessage = async (msg: any) => {
         } else {
             // Verificar si la IA generó una repregunta técnica para Arias
             const consultMatch = aiResponse.match(/\[CONSULTAR_ARIAS:\s*([^\]]+)\]/i);
-            const activeTicket = quotesService.getActiveCustomerTicket(from);
 
             if (consultMatch && activeTicket) {
                 const techQuestion = consultMatch[1].trim();
@@ -228,11 +243,12 @@ const handleMessage = async (msg: any) => {
             } else {
                 aiResponse = aiResponse.replace(/\[CONSULTAR_ARIAS:[^\]]+\]/i, '').trim();
 
-                // Filtrar cortesías y saludos para NUNCA molestar a Arias con "gracias", "ok", "listo", etc.
+                // Filtrar cortesías y agendamiento para NUNCA molestar a Arias innecesariamente
                 const isCourtesy = /^(gracias|muchas gracias|mil gracias|ok|vale|listo|dale|perfecto|excelente|bien|bueno|de una|está bien|ya voy|voy para allá|voy saliendo|hola|buenos días|buenas tardes|buenas noches|hasta luego|chao|adiós|grx|grax)[\s!.,]*$/i.test(cleanText);
+                const isSchedulingOrGeneral = /(hora|cu[aá]ndo|cita|turno|d[ií]a|agend|llegar|llevar|donde|d[oó]nde|ubicaci[oó]n|pago|tarjeta|transferencia)/i.test(cleanText);
 
-                // Si no fue cortesía y el cliente tiene un ticket activo reciente con una pregunta técnica real
-                if (activeTicket && !isCourtesy && !cleanText.includes('activar') && (cleanText.includes('?') || cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('precio') || cleanText.includes('garantia'))) {
+                // Si no fue cortesía ni agendamiento y el cliente tiene un ticket activo con una repregunta técnica sobre el precio o trabajo
+                if (activeTicket && !isCourtesy && !isSchedulingOrGeneral && !cleanText.includes('activar') && (cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('rebaja') || cleanText.includes('descuento') || cleanText.includes('repuesto'))) {
                     await quotesService.forwardCustomerFollowup(activeTicket, textMessage);
                 }
             }

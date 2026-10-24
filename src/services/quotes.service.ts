@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { sendWhatsAppMessage } from './whatsapp.service';
-import { parseMechanicVoiceQuote } from './ai.service';
+import { parseMechanicVoiceQuote, appendConversationMessage } from './ai.service';
 
 export interface QuoteTicket {
     id: string; // "101", "102", ...
@@ -14,6 +14,7 @@ export interface QuoteTicket {
     mechanicMessageId?: string;
     confirmMessageId?: string;
     quotePrice?: string;
+    availability?: string | null;
     quoteNotes?: string;
     createdAt: number;
     updatedAt: number;
@@ -282,14 +283,21 @@ class QuotesService {
         }
 
         // Si el mensaje es una frase conversacional o proviene de una nota de voz de Arias, procesar con IA
-        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile') || isCorrection) {
+        let quotePrice = cleanQuote;
+        let quoteAvailability: string | null = null;
+
+        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile') || cleanQuote.toLowerCase().includes('hora') || cleanQuote.toLowerCase().includes('tarde') || cleanQuote.toLowerCase().includes('mañana') || cleanQuote.toLowerCase().includes('miercoles') || cleanQuote.toLowerCase().includes('miércoles') || isCorrection) {
             const aiParsed = await parseMechanicVoiceQuote(cleanQuote);
             if (aiParsed) {
-                cleanQuote = aiParsed.replace(/\*/g, '').trim();
+                quotePrice = (aiParsed.price || cleanQuote).replace(/\*/g, '').trim();
+                quoteAvailability = aiParsed.availability ? aiParsed.availability.replace(/\*/g, '').trim() : null;
             }
         }
 
-        matchedTicket.quotePrice = cleanQuote;
+        matchedTicket.quotePrice = quotePrice;
+        if (quoteAvailability) {
+            matchedTicket.availability = quoteAvailability;
+        }
         matchedTicket.status = 'QUOTED';
         matchedTicket.updatedAt = Date.now();
         this.saveQuotes();
@@ -299,18 +307,30 @@ class QuotesService {
         if (isCorrection) {
             clientMsg = `Disculpa, Arias, nuestro técnico especialista, te actualiza el valor exacto para tu ${matchedTicket.vehicle}:\n\n` +
                 `🔧 Servicio: ${matchedTicket.service}\n` +
-                `💵 Valor: ${cleanQuote}\n\n` +
+                `💵 Valor: ${matchedTicket.quotePrice}\n` +
+                (matchedTicket.availability ? `📅 Disponibilidad de Arias: ${matchedTicket.availability}\n\n` : `\n`) +
                 `¿Te gustaría agendar una cita para esta semana? 🚗`;
         } else {
             clientMsg = `¡Hola! Arias, nuestro técnico especialista, revisó la cotización para tu ${matchedTicket.vehicle}:\n\n` +
                 `🔧 Servicio: ${matchedTicket.service}\n` +
-                `💵 Valor: ${cleanQuote}\n\n` +
-                `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio (de lunes a sábado) 🚗 ¿Te gustaría agendar tu cita para hoy o mañana?`;
+                `💵 Valor: ${matchedTicket.quotePrice}\n` +
+                (matchedTicket.availability ? `📅 Disponibilidad de Arias: ${matchedTicket.availability}\n\n` : `\n`) +
+                (matchedTicket.availability
+                    ? `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio 🚗 ¿Te agendamos para esa hora o prefieres otro momento?`
+                    : `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio (de lunes a sábado) 🚗 ¿Te gustaría agendar tu cita para hoy o mañana?`);
         }
 
         // Enviar respuesta al cliente (ÚNICAMENTE UNA SOLA VEZ)
         const targetCustomer = matchedTicket.customerJid || `${matchedTicket.customerPhone}@s.whatsapp.net`;
         await sendWhatsAppMessage(targetCustomer, clientMsg);
+
+        // Guardar mensaje en el historial de conversación para asegurar congruencia total en el chat
+        if (matchedTicket.customerPhone) {
+            appendConversationMessage(matchedTicket.customerPhone, 'assistant', clientMsg);
+        }
+        if (matchedTicket.customerJid && matchedTicket.customerJid !== matchedTicket.customerPhone) {
+            appendConversationMessage(matchedTicket.customerJid, 'assistant', clientMsg);
+        }
 
         // 3. Confirmar a Arias el técnico
         let customerDisplay = matchedTicket.customerPhone;
@@ -321,7 +341,8 @@ class QuotesService {
         const confirmMsg = `✅ *Cotización #${matchedTicket.id} ${actionText} al cliente (${customerDisplay}).*\n\n` +
             `🚗 *Vehículo:* ${matchedTicket.vehicle}\n` +
             `🔧 *Trabajo:* ${matchedTicket.service}\n` +
-            `💵 *Valor enviado:* ${cleanQuote}\n` +
+            `💵 *Valor enviado:* ${matchedTicket.quotePrice}\n` +
+            (matchedTicket.availability ? `📅 *Disponibilidad enviada:* ${matchedTicket.availability}\n` : '') +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `*(Si el cliente hace preguntas adicionales, te notificaré aquí).*`;
 
@@ -338,10 +359,16 @@ class QuotesService {
     /**
      * Obtiene el ticket activo más reciente de un cliente
      */
-    public getActiveCustomerTicket(customerJid: string): QuoteTicket | null {
+    public getActiveCustomerTicket(customerJid?: string, customerPhone?: string): QuoteTicket | null {
         const now = Date.now();
+        const cleanPhone = customerPhone ? customerPhone.replace(/\D/g, '') : '';
         const customerTickets = Object.values(this.tickets)
-            .filter(t => t.customerJid === customerJid && (now - t.createdAt < 24 * 60 * 60 * 1000))
+            .filter(t => {
+                const matchJid = customerJid && t.customerJid === customerJid;
+                const matchPhone = cleanPhone && (t.customerPhone === cleanPhone || t.customerPhone.endsWith(cleanPhone.slice(-10)));
+                const isRecent = (now - t.createdAt < 24 * 60 * 60 * 1000);
+                return (matchJid || matchPhone) && isRecent;
+            })
             .sort((a, b) => b.createdAt - a.createdAt);
 
         return customerTickets[0] || null;

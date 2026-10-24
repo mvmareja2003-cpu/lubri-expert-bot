@@ -94,6 +94,12 @@ REGLA DE ORO 9 (PROHIBIDO ASUMIR O INVENTAR PRECIOS):
 - Para carros o motos donde el cliente pida marcas o viscosidades específicas (Castrol, Total Quartz, Motul, Liqui Moly, Valvoline, Akron, Havoline, Petrobras), cotiza con los precios oficiales por cuarto o galón del catálogo. Si piden una referencia que NO esté en el catálogo, NUNCA inventes el precio: aclárale que para esa referencia puntual se confirma el valor y existencia física en serviteca.
 REGLA DE ORO 10 (COHERENCIA DE PRECIOS):
 - Si el cliente dice que un precio está caro, NUNCA le ofrezcas una opción con un precio mayor (ejemplo: jamás digas que 214.000 COP es más económico que 150.000 COP). Sé coherente. Si no hay una opción más baja en catálogo, invítalo a revisar opciones en serviteca.
+REGLA DE ORO 11 (COHERENCIA Y CONGRUENCIA EN CITAS Y DISPONIBILIDAD DE ARIAS):
+- Si Arias ya envió una cotización al cliente y mencionó disponibilidad (ej: "Miércoles a las 4:00 PM" o "Martes a las 2:00 PM"):
+  Cuando el cliente pregunte "¿Cuándo lo puedo llevar?", "¿A qué hora?", "¿Para cuándo hay cita?", "¿Tiene cupo?", "¿Para hoy?", DEBES responder con TOTAL COHERENCIA confirmando la disponibilidad que Arias indicó:
+  "Arias nos indicó que tiene disponibilidad para atender tu vehículo el [Día y Hora indicada por Arias] 🚗 ¿Te agendamos para esa hora o prefieres otro momento?".
+- NUNCA respondas con recomendaciones genéricas de horario valle si Arias ya informó una hora o día específico para esa cotización.
+- Si Arias NO mencionó hora específica en la cotización, pregúntale al cliente qué día y hora le queda más cómodo entre lunes y sábado (7:00 am a 4:15 pm entre semana, 7:00 am a 3:45 pm sábados).
 
 ESTA ES LA INFORMACIÓN OFICIAL Y TARIFAS DE LUBRI EXPERT:
 ${kb}
@@ -128,9 +134,33 @@ interface ChatMessage {
   content: string;
 }
 
+export interface MechanicQuoteExtraction {
+  price: string;
+  availability?: string | null;
+}
+
 const conversations: Record<string, ChatMessage[]> = {};
 
-export const getAiResponse = async (message: string, phone: string): Promise<string> => {
+/**
+ * Añade un mensaje al historial de conversación de un cliente
+ */
+export const appendConversationMessage = (phone: string, role: 'assistant' | 'user', content: string) => {
+  if (!phone) return;
+  if (!conversations[phone]) {
+    conversations[phone] = [
+      { role: 'system', content: getSystemPrompt() }
+    ];
+  }
+  conversations[phone].push({ role, content });
+  if (conversations[phone].length > 16) {
+    conversations[phone] = [
+      conversations[phone][0],
+      ...conversations[phone].slice(-14)
+    ];
+  }
+};
+
+export const getAiResponse = async (message: string, phone: string, contextTicketInfo?: string): Promise<string> => {
   const openai = getOpenAIClient();
   if (!openai) {
     return handleKnowledgeFallback(message);
@@ -145,20 +175,29 @@ export const getAiResponse = async (message: string, phone: string): Promise<str
       conversations[phone][0] = { role: 'system', content: getSystemPrompt() };
     }
 
+    const messagesToSend: ChatMessage[] = [...conversations[phone]];
+    if (contextTicketInfo) {
+      messagesToSend.push({
+        role: 'system',
+        content: `CONTEXTO DE COTIZACIÓN ACTIVA CON ARIAS PARA ESTE CLIENTE:\n${contextTicketInfo}\nIMPORTANTE: Si el cliente pregunta cuándo llevarlo, a qué hora, o sobre la cita, responde con TOTAL COHERENCIA usando la disponibilidad que indicó Arias.`
+      });
+    }
+
+    messagesToSend.push({ role: 'user', content: message });
     conversations[phone].push({ role: 'user', content: message });
 
-    // Mantener historial compacto (últimos 12 mensajes)
-    if (conversations[phone].length > 14) {
+    // Mantener historial compacto (últimos 14 mensajes)
+    if (conversations[phone].length > 16) {
       conversations[phone] = [
         conversations[phone][0],
-        ...conversations[phone].slice(-12)
+        ...conversations[phone].slice(-14)
       ];
     }
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: conversations[phone] as any,
-      temperature: 0.4,
+      messages: messagesToSend as any,
+      temperature: 0.3,
       max_tokens: 500
     });
 
@@ -190,11 +229,11 @@ export const transcribeAudio = async (filePath: string): Promise<string | null> 
 };
 
 /**
- * Parsea el mensaje o nota de voz de Arias el técnico para extraer el valor en COP y detalles
+ * Parsea el mensaje o nota de voz de Arias el técnico para extraer el valor en COP y la disponibilidad
  */
-export const parseMechanicVoiceQuote = async (rawText: string): Promise<string> => {
+export const parseMechanicVoiceQuote = async (rawText: string): Promise<MechanicQuoteExtraction> => {
   const openai = getOpenAIClient();
-  if (!openai) return rawText;
+  if (!openai) return { price: rawText, availability: null };
 
   try {
     const response = await openai.chat.completions.create({
@@ -202,19 +241,26 @@ export const parseMechanicVoiceQuote = async (rawText: string): Promise<string> 
       messages: [
         {
           role: 'system',
-          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico especialista del taller, envió una nota de voz o mensaje cotizando o corrigiendo un trabajo. Extrae el PRECIO en pesos colombianos (ej: 140.000 COP) y los detalles o desgloses que mencione (ej: mano de obra, repuesto, correa, qué incluye). Genera una sola línea corta, limpia y profesional para mostrarle al cliente en el campo Valor de la cotización. Si menciona mano de obra y repuesto por separado, desglósalo claramente (ej: "120.000 COP mano de obra + 200.000 COP correa (Total: 320.000 COP)"). NUNCA uses asteriscos.'
+          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico, envió una cotización o corrección por audio o texto. Extrae un objeto JSON con dos campos:\n' +
+            '- price: El valor o desglose limpio en pesos COP (ej: "180.000 COP total (60.000 COP discos + 70.000 COP campanas)" o "140.000 COP mano de obra"). Si menciona mano de obra y repuesto por separado, desglósalo claramente con el total. NUNCA uses asteriscos.\n' +
+            '- availability: Si mencionó día u hora de disponibilidad para atender la cita (ej: "Miércoles a las 4:00 PM", "Mañana a las 9:00 AM", "Martes por la tarde"), extráelo formalmente. Si NO mencionó disponibilidad u horario, pon null.\n' +
+            'Devuelve ESTRICTAMENTE JSON con esas dos llaves: price y availability.'
         },
         { role: 'user', content: rawText }
       ],
+      response_format: { type: 'json_object' },
       temperature: 0.1,
-      max_tokens: 100
+      max_tokens: 150
     });
 
-    const parsed = response.choices[0]?.message?.content?.trim();
-    return parsed || rawText;
+    const parsedJson = JSON.parse(response.choices[0]?.message?.content || '{}');
+    return {
+      price: (parsedJson.price || rawText).replace(/\*/g, '').trim(),
+      availability: parsedJson.availability ? String(parsedJson.availability).replace(/\*/g, '').trim() : null
+    };
   } catch (err) {
     console.error('[AI SERVICE] Error parseando nota de voz de Arias:', err);
-    return rawText;
+    return { price: rawText, availability: null };
   }
 };
 
