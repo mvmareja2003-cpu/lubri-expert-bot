@@ -138,7 +138,6 @@ const handleMessage = async (msg: any) => {
             await sendWhatsAppMessage(ownerPhone, alertMsg);
 
             await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
-            humanTakeover[from] = Date.now();
             return;
         }
 
@@ -243,12 +242,12 @@ const handleMessage = async (msg: any) => {
             } else {
                 aiResponse = aiResponse.replace(/\[CONSULTAR_ARIAS:[^\]]+\]/i, '').trim();
 
-                // Filtrar cortesías y agendamiento para NUNCA molestar a Arias innecesariamente
+                // Filtrar cortesías, servicios de catálogo y agendamiento para NUNCA molestar a Arias con preguntas que el bot responde
                 const isCourtesy = /^(gracias|muchas gracias|mil gracias|ok|vale|listo|dale|perfecto|excelente|bien|bueno|de una|está bien|ya voy|voy para allá|voy saliendo|hola|buenos días|buenas tardes|buenas noches|hasta luego|chao|adiós|grx|grax)[\s!.,]*$/i.test(cleanText);
-                const isSchedulingOrGeneral = /(hora|cu[aá]ndo|cita|turno|d[ií]a|agend|llegar|llevar|donde|d[oó]nde|ubicaci[oó]n|pago|tarjeta|transferencia)/i.test(cleanText);
+                const isCatalogOrGeneral = /(alineaci|balanceo|aceite|combo|llanta|bater|plumilla|desinfecci|refrigerante|liquido|hora|cu[aá]ndo|cita|turno|d[ií]a|agend|llegar|llevar|donde|d[oó]nde|ubicaci[oó]n|pago|tarjeta|transferencia)/i.test(cleanText);
 
-                // Si no fue cortesía ni agendamiento y el cliente tiene un ticket activo con una repregunta técnica sobre el precio o trabajo
-                if (activeTicket && !isCourtesy && !isSchedulingOrGeneral && !cleanText.includes('activar') && (cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('rebaja') || cleanText.includes('descuento') || cleanText.includes('repuesto'))) {
+                // Si no fue cortesía ni servicio de catálogo/agendamiento y el cliente tiene un ticket activo con una repregunta técnica sobre el trabajo mecánico cotizado
+                if (activeTicket && !isCourtesy && !isCatalogOrGeneral && !cleanText.includes('activar') && (cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('rebaja') || cleanText.includes('descuento') || cleanText.includes('repuesto'))) {
                     await quotesService.forwardCustomerFollowup(activeTicket, textMessage);
                 }
             }
