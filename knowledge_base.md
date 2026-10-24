@@ -42,8 +42,8 @@ TARIFAS DE SERVICIOS ESTANDARIZADOS EXPRÉS (Cotizados de inmediato por el bot):
 
 SERVICIOS COTIZADOS POR ARIAS EL TÉCNICO (+57 314 778 5316):
 - Escáner computarizado OBD-II y diagnóstico electrónico: Cotizado por Arias según vehículo y tipo de falla.
-- Frenos livianos: Pastillas de freno, bandas, rectificación de discos y rectificación de campana (Lunes a Sábado). ¡NO atendemos frenos pesados ni camiones!
-- Mecánica rápida y chasis: Tren delantero, caja de dirección, suspensión (amortiguadores, resortes, puentes, bujes), servicios de prensa hidráulica, cambio de correas de accesorios.
+- Frenos livianos: Pastillas de freno, bandas, rectificación de discos y rectificación de campana (Lunes a Sábado). ¡NO atendemos frenos pesados ni camiones! Obligatorio preguntar si es adelante, atrás o en las 4 ruedas antes de cotizar.
+- Mecánica rápida y chasis: Tren delantero, caja de dirección, suspensión (amortiguadores, resortes, puentes, bujes, tijeras, copelas), servicios de prensa hidráulica, cambio de correas de accesorios. Obligatorio preguntar si es adelante, atrás o en las 4 ruedas para amortiguadores y suspensión.
 - Mecánica general y especializada: Cambio de kit de embrague / clutch, reparación de motor, cajas mecánicas, cajas automáticas, aire acondicionado (mantenimiento y reparación), servicio eléctrico, electrónico, autrónico y reprogramación de computadoras (ECU).
 - ¡PROHIBICIÓN ESTRICTA!: En Lubri Expert NO cambiamos kit de distribución ni correas de tiempo. Únicamente cambiamos correas de accesorios.
 

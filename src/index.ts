@@ -193,10 +193,24 @@ const handleMessage = async (msg: any) => {
 
             await quotesService.createTicket(from, phoneNumber, vehicle, service, details);
         } else {
-            // Si el cliente tiene un ticket activo y hace una repregunta o detalle adicional
+            // Verificar si la IA generó una repregunta técnica para Arias
+            const consultMatch = aiResponse.match(/\[CONSULTAR_ARIAS:\s*([^\]]+)\]/i);
             const activeTicket = quotesService.getActiveCustomerTicket(from);
-            if (activeTicket && !cleanText.includes('activar') && !cleanText.includes('hola') && cleanText.length > 5) {
-                await quotesService.forwardCustomerFollowup(activeTicket, msgBody);
+
+            if (consultMatch && activeTicket) {
+                const techQuestion = consultMatch[1].trim();
+                aiResponse = aiResponse.replace(/\[CONSULTAR_ARIAS:[^\]]+\]/i, '').trim();
+                await quotesService.forwardCustomerFollowup(activeTicket, techQuestion);
+            } else {
+                aiResponse = aiResponse.replace(/\[CONSULTAR_ARIAS:[^\]]+\]/i, '').trim();
+
+                // Filtrar cortesías y saludos para NUNCA molestar a Arias con "gracias", "ok", "listo", etc.
+                const isCourtesy = /^(gracias|muchas gracias|mil gracias|ok|vale|listo|dale|perfecto|excelente|bien|bueno|de una|está bien|ya voy|voy para allá|voy saliendo|hola|buenos días|buenas tardes|buenas noches|hasta luego|chao|adiós|grx|grax)[\s!.,]*$/i.test(cleanText);
+
+                // Si no fue cortesía y el cliente tiene un ticket activo reciente con una pregunta técnica real
+                if (activeTicket && !isCourtesy && !cleanText.includes('activar') && (cleanText.includes('?') || cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('precio') || cleanText.includes('garantia'))) {
+                    await quotesService.forwardCustomerFollowup(activeTicket, msgBody);
+                }
             }
         }
 

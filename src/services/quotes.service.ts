@@ -92,8 +92,7 @@ class QuotesService {
         this.saveQuotes();
 
         // Enviar ticket a Arias el técnico
-        const mechanicMsg = `🔔 *NUEVA SOLICITUD DE COTIZACIÓN #${id}*\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        const mechanicMsg = `🔔 *NUEVA SOLICITUD DE COTIZACIÓN #${id}*\n\n` +
             `🚗 *Vehículo:* ${ticket.vehicle}\n` +
             `🔧 *Trabajo a cotizar:* ${ticket.service}\n` +
             `💬 *Detalle:* ${ticket.details}\n` +
@@ -237,8 +236,13 @@ class QuotesService {
      * Reenvía a Arias una pregunta o requerimiento adicional del cliente
      */
     public async forwardCustomerFollowup(ticket: QuoteTicket, followupText: string) {
-        const updateMsg = `🔔 *PREGUNTA ADICIONAL DEL CLIENTE - TICKET #${ticket.id}*\n` +
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        const cleanFollowup = followupText.trim().toLowerCase();
+        const isCourtesy = /^(gracias|muchas gracias|mil gracias|ok|vale|listo|dale|perfecto|excelente|bien|bueno|de una|está bien|ya voy|voy para allá|voy saliendo|hola|buenos días|buenas tardes|buenas noches|hasta luego|chao|adiós|grx|grax)[\s!.,]*$/i.test(cleanFollowup);
+        if (isCourtesy) {
+            return;
+        }
+
+        const updateMsg = `🔔 *PREGUNTA ADICIONAL DEL CLIENTE - TICKET #${ticket.id}*\n\n` +
             `🚗 *Vehículo:* ${ticket.vehicle}\n` +
             `🔧 *Servicio inicial:* ${ticket.service}\n` +
             `💬 *El cliente pregunta:* "${followupText}"\n` +
