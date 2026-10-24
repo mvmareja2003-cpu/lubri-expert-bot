@@ -69,21 +69,23 @@ export const initWhatsAppClient = async (onMessageReceived: (msg: any) => Promis
     });
 };
 
-export const sendWhatsAppMessage = async (to: string, body: string) => {
+export const sendWhatsAppMessage = async (to: string, body: string): Promise<any> => {
     try {
         if (!sock) {
             console.log(`[WhatsApp no conectado] Simulación a ${to}:\n${body}`);
-            return;
+            return null;
         }
 
         let chatId = to;
         if (to.includes('@c.us')) chatId = to.replace('@c.us', '@s.whatsapp.net');
         else if (!to.includes('@')) chatId = `${to.replace(/\D/g, '')}@s.whatsapp.net`;
         
-        await sock.sendMessage(chatId, { text: body });
+        const sent = await sock.sendMessage(chatId, { text: body });
         console.log(`[Baileys] Mensaje enviado a ${chatId}`);
+        return sent;
     } catch (error: any) {
         console.error(`[Baileys] Error al enviar a ${to}:`, error);
+        return null;
     }
 };
 

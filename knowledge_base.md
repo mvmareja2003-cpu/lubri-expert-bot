@@ -32,16 +32,20 @@ HORARIOS Y CAPACIDAD OPERATIVA
   * Escaneo computarizado OBD-II: 15 minutos.
   * Alineación 3D y balanceo: 45 minutos (Lunes a Sábado únicamente).
 
-TARIFAS DE SERVICIOS INDIVIDUALES
+TARIFAS DE SERVICIOS ESTANDARIZADOS EXPRÉS (Cotizados de inmediato por el bot):
 - Alineación 3D y Balanceo computarizado: $120.000 COP (las 4 ruedas, Lunes a Sábado).
-- Escaneo computarizado OBD-II (diagnóstico de sensores, lectura y borrado de fallas / Check Engine): $70.000 COP.
 - Desinfección y limpieza de Aire Acondicionado con producto profesional (elimina hongos, bacterias y malos olores): $40.000 COP.
 - Plumillas Limpiaparabrisas Softwiper Multi-acople y Traseras: $40.500 COP c/u con instalación profesional GRATIS.
-- Líquido de frenos: Prueba técnica del punto de ebullición (DOT 3 / DOT 4) y purga.
-- Líquido refrigerante: Medición de densidad y cambio completo en refrigerante rojo, verde o rosa OAT.
-- Frenos: Venta e instalación de pastillas de freno marca líder Brake Pad (Lunes a Sábado).
 - Baterías: Marca oficial Willard con diagnóstico computarizado del alternador y prueba de arranque gratis.
   * Plan Chatarra: Descuento especial de $20.000 COP por entregar la batería vieja.
+- Líquidos: Cambio y venta de refrigerantes (Akron Rosa, Rojo, Verde, Mobil) y líquido de frenos por cuarto.
+
+SERVICIOS COTIZADOS POR ARIAS EL TÉCNICO (+57 314 778 5316):
+- Escáner computarizado OBD-II y diagnóstico electrónico: Cotizado por Arias según vehículo y tipo de falla.
+- Frenos livianos: Pastillas de freno, bandas, rectificación de discos y rectificación de campana (Lunes a Sábado). ¡NO atendemos frenos pesados ni camiones!
+- Mecánica rápida y chasis: Tren delantero, caja de dirección, suspensión (amortiguadores, resortes, puentes, bujes), servicios de prensa hidráulica, cambio de correas de accesorios.
+- Mecánica general y especializada: Cambio de kit de embrague / clutch, reparación de motor, cajas mecánicas, cajas automáticas, aire acondicionado (mantenimiento y reparación), servicio eléctrico, electrónico, autrónico y reprogramación de computadoras (ECU).
+- ¡PROHIBICIÓN ESTRICTA!: En Lubri Expert NO cambiamos kit de distribución ni correas de tiempo. Únicamente cambiamos correas de accesorios.
 
 =======================================================
 PAQUETES ESTANDARIZADOS DE LUBRICACIÓN (EXCLUSIVO PARA AUTOMÓVILES / CARROS DE HASTA 4 CUARTOS)

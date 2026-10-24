@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import { getAiResponse, transcribeAudio } from './services/ai.service';
 import { sock, initWhatsAppClient, sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppDocument, downloadWhatsAppMedia } from './services/whatsapp.service';
+import { quotesService } from './services/quotes.service';
 
 dotenv.config();
 
@@ -95,6 +96,16 @@ const handleMessage = async (msg: any) => {
                             msg.message?.imageMessage?.caption || 
                             msg.message?.videoMessage?.caption || '';
 
+        // Si el mensaje proviene de Arias el técnico (+57 314 778 5316), procesar cotización
+        if (quotesService.isMechanic(phoneNumber)) {
+            let actualMsg = msg.message;
+            if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
+            const quotedStanzaId = actualMsg?.extendedTextMessage?.contextInfo?.stanzaId;
+            console.log(`[COTIZADOR ARIAS] Mensaje recibido de Arias (+${phoneNumber}): "${textMessage}" (Quoted ID: ${quotedStanzaId || 'ninguno'})`);
+            await quotesService.handleMechanicMessage(from, textMessage, quotedStanzaId);
+            return;
+        }
+
         // Si el cliente envía palabras de saludo o reinicio, reactivar de inmediato
         const cleanText = textMessage.toLowerCase().trim();
         const isReactivateCmd = ['bot', 'activar', 'hola', 'menu', 'buenos dias', 'buenas tardes', 'reiniciar', 'cotizar', 'informacion', 'buena'].some(k => cleanText.includes(k));
@@ -171,6 +182,23 @@ const handleMessage = async (msg: any) => {
 
         // Obtener respuesta de la IA
         let aiResponse = await getAiResponse(msgBody, phoneNumber);
+
+        // Verificar si la IA generó una solicitud de cotización para Arias el técnico
+        const quoteMatch = aiResponse.match(/\[SOLICITAR_COTIZACION:\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\]]+)\]/i);
+        if (quoteMatch) {
+            const vehicle = quoteMatch[1].trim();
+            const service = quoteMatch[2].trim();
+            const details = quoteMatch[3].trim();
+            aiResponse = aiResponse.replace(/\[SOLICITAR_COTIZACION:[^\]]+\]/i, '').trim();
+
+            await quotesService.createTicket(from, phoneNumber, vehicle, service, details);
+        } else {
+            // Si el cliente tiene un ticket activo y hace una repregunta o detalle adicional
+            const activeTicket = quotesService.getActiveCustomerTicket(from);
+            if (activeTicket && !cleanText.includes('activar') && !cleanText.includes('hola') && cleanText.length > 5) {
+                await quotesService.forwardCustomerFollowup(activeTicket, msgBody);
+            }
+        }
 
         // Verificar si la IA activó traspaso a humano
         if (aiResponse.includes('[ESCALAR_HUMANO]')) {
