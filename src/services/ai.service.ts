@@ -189,6 +189,35 @@ export const transcribeAudio = async (filePath: string): Promise<string | null> 
   }
 };
 
+/**
+ * Parsea el mensaje o nota de voz de Arias el técnico para extraer el valor en COP y detalles
+ */
+export const parseMechanicVoiceQuote = async (rawText: string): Promise<string> => {
+  const openai = getOpenAIClient();
+  if (!openai) return rawText;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico especialista del taller, envió una nota de voz o mensaje cotizando un trabajo. Extrae el PRECIO en pesos colombianos (ej: 140.000 COP) y los detalles técnicos que mencione (ej: mano de obra, qué incluye). Genera una sola línea corta, limpia y profesional para mostrarle al cliente en el campo Valor de la cotización. NUNCA uses asteriscos. Ejemplo: si dice "eso sale en 140 mil con mano de obra", responde: "140.000 COP (incluye mano de obra)". Si solo dijo un número, responde solo el valor: "120.000 COP".'
+        },
+        { role: 'user', content: rawText }
+      ],
+      temperature: 0.1,
+      max_tokens: 80
+    });
+
+    const parsed = response.choices[0]?.message?.content?.trim();
+    return parsed || rawText;
+  } catch (err) {
+    console.error('[AI SERVICE] Error parseando nota de voz de Arias:', err);
+    return rawText;
+  }
+};
+
 const handleKnowledgeFallback = (message: string): string => {
   const text = message.toLowerCase();
 

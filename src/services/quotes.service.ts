@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { sendWhatsAppMessage } from './whatsapp.service';
+import { parseMechanicVoiceQuote } from './ai.service';
 
 export interface QuoteTicket {
     id: string; // "101", "102", ...
@@ -155,11 +156,9 @@ class QuotesService {
             `💬 *Detalle:* ${ticket.details}\n` +
             `📱 *Cliente:* ${displayPhone}\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `👉 *Para cotizar, responde/cita este mensaje o escribe:*\n` +
-            `*#${id} [Precio] [Detalle opcional]*\n\n` +
-            `*Ejemplos:* \n` +
-            `• Desliza este mensaje y pon: \`140.000 mano de obra\`\n` +
-            `• O escribe: \`#${id} 140.000\``;
+            `👉 *Para cotizar, responde/cita este mensaje con audio o texto:*\n` +
+            `🎤 *Nota de voz:* Desliza este mensaje y habla (ej: "Son 140 mil mano de obra")\n` +
+            `✍️ *Texto:* Desliza y pon el valor, o escribe: \`#${id} 140.000\``;
 
         const targetArias = this.mechanicJid || this.mechanicPhone;
         const sent = await sendWhatsAppMessage(targetArias, mechanicMsg);
@@ -248,6 +247,14 @@ class QuotesService {
         const isCorrection = cleanQuote.toLowerCase().startsWith('corregir');
         if (isCorrection) {
             cleanQuote = cleanQuote.replace(/^corregir\s*/i, '').trim();
+        }
+
+        // Si el mensaje es una frase conversacional o proviene de una nota de voz de Arias, procesar con IA
+        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile')) {
+            const aiParsed = await parseMechanicVoiceQuote(cleanQuote);
+            if (aiParsed) {
+                cleanQuote = aiParsed.replace(/\*/g, '').trim();
+            }
         }
 
         matchedTicket.quotePrice = cleanQuote;

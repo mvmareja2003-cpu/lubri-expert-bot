@@ -122,8 +122,12 @@ export const downloadWhatsAppMedia = async (msg: any): Promise<string | null> =>
         const buffer = await downloadMediaMessage(msg, 'buffer', {});
         if (!buffer) return null;
         
+        let actualMsg = msg.message;
+        if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
+        else if (actualMsg?.viewOnceMessageV2) actualMsg = actualMsg.viewOnceMessageV2.message;
+
         let extension = 'bin';
-        const messageType = Object.keys(msg.message || {})[0];
+        const messageType = Object.keys(actualMsg || {})[0];
         
         if (messageType === 'audioMessage') extension = 'ogg';
         else if (messageType === 'videoMessage') extension = 'mp4';

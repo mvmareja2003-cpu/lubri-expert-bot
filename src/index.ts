@@ -93,12 +93,49 @@ const handleMessage = async (msg: any) => {
         if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
         else if (actualMsg?.viewOnceMessageV2) actualMsg = actualMsg.viewOnceMessageV2.message;
 
-        const quotedStanzaId = actualMsg?.extendedTextMessage?.contextInfo?.stanzaId;
+        const contextInfo = actualMsg?.extendedTextMessage?.contextInfo || actualMsg?.audioMessage?.contextInfo;
+        const quotedStanzaId = contextInfo?.stanzaId;
 
-        const textMessage = actualMsg?.conversation || 
-                            actualMsg?.extendedTextMessage?.text || 
-                            actualMsg?.imageMessage?.caption || 
-                            actualMsg?.videoMessage?.caption || '';
+        let textMessage = actualMsg?.conversation || 
+                          actualMsg?.extendedTextMessage?.text || 
+                          actualMsg?.imageMessage?.caption || 
+                          actualMsg?.videoMessage?.caption || '';
+
+        // Si es una nota de voz o audio (del cliente o de Arias), transcribir primero con Whisper
+        if (actualMsg?.audioMessage) {
+            console.log(`[AUDIO] Recibido audio de ${from}. Descargando y transcribiendo con Whisper...`);
+            const audioPath = await downloadWhatsAppMedia(msg);
+            if (audioPath) {
+                const transcribedText = await transcribeAudio(audioPath);
+                try { fs.unlinkSync(audioPath); } catch (e) { }
+
+                if (transcribedText) {
+                    textMessage = transcribedText;
+                    console.log(`[AUDIO TRANSCRITO] ${from}: "${textMessage}"`);
+                } else {
+                    await sendWhatsAppMessage(from, 'Disculpa, no pude entender claramente la nota de voz. ¿Podrías escribirla por favor? 🚗');
+                    return;
+                }
+            } else {
+                await sendWhatsAppMessage(from, 'Disculpa, tuve un problema al descargar el audio. ¿Podrías escribirme? 🚗');
+                return;
+            }
+        } else if (actualMsg?.imageMessage || actualMsg?.documentMessage) {
+            const now = Date.now();
+            const photoPhone = (key.remoteJidAlt || from).split('@')[0].split(':')[0].replace(/\D/g, '');
+            if (lastImageReply[photoPhone] && (now - lastImageReply[photoPhone] < 60000)) return;
+            lastImageReply[photoPhone] = now;
+
+            const ownerPhone = process.env.OWNER_PHONE || '573016593654';
+            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${photoPhone}\n📄 *Motivo:* Envió una foto o documento (tarjeta de propiedad, daño o comprobante).\n\n👉 *Abrir chat directo:* https://wa.me/${photoPhone}`;
+            await sendWhatsAppMessage(ownerPhone, alertMsg);
+
+            await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
+            humanTakeover[from] = Date.now();
+            return;
+        }
+
+        if (!textMessage || textMessage.trim().length === 0) return;
 
         // Extraer número de teléfono real del cliente (desenredando LIDs @lid de WhatsApp)
         let phoneNumber = '';
@@ -143,7 +180,6 @@ const handleMessage = async (msg: any) => {
 
         // Si el cliente envía palabras de saludo o reinicio, reactivar de inmediato
         const cleanText = textMessage.toLowerCase().trim();
-        const isReactivateCmd = ['bot', 'activar', 'hola', 'menu', 'buenos dias', 'buenas tardes', 'reiniciar', 'cotizar', 'informacion', 'buena'].some(k => cleanText.includes(k));
 
         // Si el humano responde desde el celular o WhatsApp Web, pausar el bot por 15 mins
         if (fromMe) {
@@ -166,57 +202,10 @@ const handleMessage = async (msg: any) => {
             }
         }
 
-        let actualMessage = msg.message;
-        if (actualMessage?.ephemeralMessage) actualMessage = actualMessage.ephemeralMessage.message;
-        else if (actualMessage?.viewOnceMessageV2) actualMessage = actualMessage.viewOnceMessageV2.message;
-
-        let msgBody = '';
-        const messageType = Object.keys(actualMessage || {})[0];
-
-        if (messageType === 'extendedTextMessage') {
-            msgBody = actualMessage.extendedTextMessage?.text;
-        } else if (messageType === 'conversation') {
-            msgBody = actualMessage.conversation;
-        } else if (messageType === 'audioMessage') {
-            console.log(`[AUDIO] Recibido audio de ${phoneNumber}. Descargando y transcribiendo con Whisper...`);
-            const audioPath = await downloadWhatsAppMedia(msg);
-            if (audioPath) {
-                const transcribedText = await transcribeAudio(audioPath);
-                try { fs.unlinkSync(audioPath); } catch (e) { }
-
-                if (transcribedText) {
-                    msgBody = transcribedText;
-                    console.log(`[AUDIO TRANSCRITO] ${phoneNumber}: "${msgBody}"`);
-                } else {
-                    await sendWhatsAppMessage(from, 'Disculpa, no pude entender claramente la nota de voz. ¿Podrías escribirla por favor? 🚗');
-                    return;
-                }
-            } else {
-                await sendWhatsAppMessage(from, 'Disculpa, tuve un problema al descargar el audio. ¿Podrías escribirme? 🚗');
-                return;
-            }
-        } else if (messageType === 'imageMessage' || messageType === 'documentMessage') {
-            const now = Date.now();
-            if (lastImageReply[phoneNumber] && (now - lastImageReply[phoneNumber] < 60000)) return;
-            lastImageReply[phoneNumber] = now;
-
-            const ownerPhone = process.env.OWNER_PHONE || '573016593654';
-            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n📄 *Motivo:* Envió una foto o documento (tarjeta de propiedad, daño o comprobante).\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
-            await sendWhatsAppMessage(ownerPhone, alertMsg);
-
-            await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
-            humanTakeover[from] = Date.now();
-            return;
-        } else {
-            return;
-        }
-
-        if (!msgBody || msgBody.trim().length === 0) return;
-
-        console.log(`[MENSAJE] De +${phoneNumber}: "${msgBody}"`);
+        console.log(`[MENSAJE] De +${phoneNumber}: "${textMessage}"`);
 
         // Obtener respuesta de la IA
-        let aiResponse = await getAiResponse(msgBody, phoneNumber);
+        let aiResponse = await getAiResponse(textMessage, phoneNumber);
 
         // Verificar si la IA generó una solicitud de cotización para Arias el técnico
         const quoteMatch = aiResponse.match(/\[SOLICITAR_COTIZACION:\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\]]+)\]/i);
@@ -244,7 +233,7 @@ const handleMessage = async (msg: any) => {
 
                 // Si no fue cortesía y el cliente tiene un ticket activo reciente con una pregunta técnica real
                 if (activeTicket && !isCourtesy && !cleanText.includes('activar') && (cleanText.includes('?') || cleanText.includes('cuanto') || cleanText.includes('incluye') || cleanText.includes('demora') || cleanText.includes('precio') || cleanText.includes('garantia'))) {
-                    await quotesService.forwardCustomerFollowup(activeTicket, msgBody);
+                    await quotesService.forwardCustomerFollowup(activeTicket, textMessage);
                 }
             }
         }
@@ -253,7 +242,7 @@ const handleMessage = async (msg: any) => {
         if (aiResponse.includes('[ESCALAR_HUMANO]')) {
             aiResponse = aiResponse.replace('[ESCALAR_HUMANO]', '').trim();
             const ownerPhone = process.env.OWNER_PHONE || '573016593654';
-            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n💬 *Último mensaje:* "${msgBody}"\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
+            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n💬 *Último mensaje:* "${textMessage}"\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
             
             await sendWhatsAppMessage(ownerPhone, alertMsg);
             humanTakeover[from] = Date.now();
