@@ -12,6 +12,7 @@ export interface QuoteTicket {
     details: string;
     status: 'PENDING' | 'QUOTED' | 'CLOSED';
     mechanicMessageId?: string;
+    confirmMessageId?: string;
     quotePrice?: string;
     quoteNotes?: string;
     createdAt: number;
@@ -85,10 +86,10 @@ class QuotesService {
             return true;
         }
 
-        // 3. Coincidencia por mensaje citado (Arias hizo swipe / citar en WhatsApp al ticket enviado)
+        // 3. Coincidencia por mensaje citado (Arias hizo swipe / citar en WhatsApp al ticket o confirmación)
         if (quotedStanzaId) {
             const hasMatchedTicket = Object.values(this.tickets).some(
-                t => t.mechanicMessageId === quotedStanzaId
+                t => t.mechanicMessageId === quotedStanzaId || t.confirmMessageId === quotedStanzaId
             );
             if (hasMatchedTicket) {
                 if (jid) {
@@ -101,7 +102,7 @@ class QuotesService {
 
         // 4. Coincidencia por comando explícito de ticket (#101, #102...)
         if (textMessage) {
-            const match = textMessage.match(/^#?(\d{3,4})\b/);
+            const match = textMessage.match(/(?:#|ticket\s*#?)\s*(\d{3,4})\b/i);
             if (match && this.tickets[match[1]]) {
                 if (jid) {
                     this.mechanicJid = jid;
@@ -182,31 +183,50 @@ class QuotesService {
         const cleanText = textMessage.trim();
 
         // 1. Buscar ticket:
-        // A) Por cita/deslizar mensaje en WhatsApp
         let matchedTicket: QuoteTicket | null = null;
 
+        // A) Por cita/deslizar mensaje en WhatsApp (sea el ticket inicial o la confirmación)
         if (quotedStanzaId) {
             matchedTicket = Object.values(this.tickets).find(
-                t => t.mechanicMessageId === quotedStanzaId
+                t => t.mechanicMessageId === quotedStanzaId || t.confirmMessageId === quotedStanzaId
             ) || null;
         }
 
-        // B) Por número de ticket explícito (#101 o 101)
+        // B) Por comando explícito (#101, # 101, ticket 101)
         if (!matchedTicket) {
-            const match = cleanText.match(/#?(\d{3,4})/);
-            if (match) {
-                const idCandidate = match[1];
-                if (this.tickets[idCandidate]) {
-                    matchedTicket = this.tickets[idCandidate];
-                }
+            const match = cleanText.match(/(?:#|ticket\s*#?)\s*(\d{3,4})\b/i);
+            if (match && this.tickets[match[1]]) {
+                matchedTicket = this.tickets[match[1]];
             }
         }
 
-        // C) Si no puso número pero solo hay 1 ticket PENDING activo
+        // C) Si empieza directamente por el número del ticket (ej: "101 140.000")
         if (!matchedTicket) {
-            const pendingTickets = Object.values(this.tickets).filter(t => t.status === 'PENDING');
+            const matchStart = cleanText.match(/^(\d{3,4})\b/);
+            if (matchStart && this.tickets[matchStart[1]]) {
+                matchedTicket = this.tickets[matchStart[1]];
+            }
+        }
+
+        // D) Si no puso número de ticket: buscar contexto inteligente
+        if (!matchedTicket) {
+            // Prioridad D1: Si hay tickets PENDING
+            const pendingTickets = Object.values(this.tickets)
+                .filter(t => t.status === 'PENDING')
+                .sort((a, b) => b.updatedAt - a.updatedAt);
+
             if (pendingTickets.length === 1) {
                 matchedTicket = pendingTickets[0];
+            } else if (pendingTickets.length === 0) {
+                // Prioridad D2: Si no hay PENDING pero hay tickets recientemente atendidos en las últimas 2 horas
+                // (como cuando Arias corrige o aclara un valor enviado hace unos minutos)
+                const recentTickets = Object.values(this.tickets)
+                    .filter(t => (Date.now() - t.updatedAt < 2 * 60 * 60 * 1000))
+                    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+                if (recentTickets.length > 0) {
+                    matchedTicket = recentTickets[0];
+                }
             }
         }
 
@@ -222,7 +242,7 @@ class QuotesService {
                     ? `Actualmente tienes estas cotizaciones pendientes:\n${activeList}\n\n👉 Por favor responde deslizando el mensaje de la cotización o escribiendo: \`#NUMERO [Precio]\``
                     : `No tienes cotizaciones pendientes en este momento.`);
 
-            await sendWhatsAppMessage(this.mechanicPhone, helpMsg);
+            await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, helpMsg);
             return true;
         }
 
@@ -238,19 +258,31 @@ class QuotesService {
             .replace(/^(vale|sale\s+en|cuesta|es\s+de)\s*/i, '')
             .trim();
 
+        // Detectar si es una corrección
+        const isCorrection = cleanQuote.toLowerCase().startsWith('corregir') ||
+                             cleanText.toLowerCase().startsWith('no') ||
+                             cleanText.toLowerCase().startsWith('espera') ||
+                             cleanText.toLowerCase().startsWith('rectifico') ||
+                             cleanText.toLowerCase().startsWith('error') ||
+                             matchedTicket.status === 'QUOTED';
+
+        if (isCorrection) {
+            cleanQuote = cleanQuote
+                .replace(/^corregir\s*/i, '')
+                .replace(/^no[,\s]*/i, '')
+                .replace(/^espera[,\s]*/i, '')
+                .replace(/^rectifico[,\s]*/i, '')
+                .replace(/^error[,\s]*/i, '')
+                .trim();
+        }
+
         if (!cleanQuote) {
             await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, `⚠️ Por favor indica el valor o detalle para el ticket #${matchedTicket.id}. Ejemplo: \`#${matchedTicket.id} 120.000 mano de obra\``);
             return true;
         }
 
-        // Verificar si es una corrección
-        const isCorrection = cleanQuote.toLowerCase().startsWith('corregir');
-        if (isCorrection) {
-            cleanQuote = cleanQuote.replace(/^corregir\s*/i, '').trim();
-        }
-
         // Si el mensaje es una frase conversacional o proviene de una nota de voz de Arias, procesar con IA
-        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile')) {
+        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile') || isCorrection) {
             const aiParsed = await parseMechanicVoiceQuote(cleanQuote);
             if (aiParsed) {
                 cleanQuote = aiParsed.replace(/\*/g, '').trim();
@@ -265,7 +297,7 @@ class QuotesService {
         // 2. Enviar respuesta formal, cordial y humana al cliente
         let clientMsg = '';
         if (isCorrection) {
-            clientMsg = `Disculpa, Arias, nuestro técnico especialista, estaba validando dos cotizaciones en simultáneo y te actualiza el valor exacto para tu ${matchedTicket.vehicle}:\n\n` +
+            clientMsg = `Disculpa, Arias, nuestro técnico especialista, te actualiza el valor exacto para tu ${matchedTicket.vehicle}:\n\n` +
                 `🔧 Servicio: ${matchedTicket.service}\n` +
                 `💵 Valor: ${cleanQuote}\n\n` +
                 `¿Te gustaría agendar una cita para esta semana? 🚗`;
@@ -276,29 +308,30 @@ class QuotesService {
                 `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio (de lunes a sábado) 🚗 ¿Te gustaría agendar tu cita para hoy o mañana?`;
         }
 
-        // Enviar respuesta al cliente
-        await sendWhatsAppMessage(matchedTicket.customerJid, clientMsg);
-        if (matchedTicket.customerPhone && matchedTicket.customerPhone.startsWith('57') && matchedTicket.customerPhone.length === 12) {
-            const phoneJid = `${matchedTicket.customerPhone}@s.whatsapp.net`;
-            if (phoneJid !== matchedTicket.customerJid) {
-                await sendWhatsAppMessage(phoneJid, clientMsg);
-            }
-        }
+        // Enviar respuesta al cliente (ÚNICAMENTE UNA SOLA VEZ)
+        const targetCustomer = matchedTicket.customerJid || `${matchedTicket.customerPhone}@s.whatsapp.net`;
+        await sendWhatsAppMessage(targetCustomer, clientMsg);
 
         // 3. Confirmar a Arias el técnico
         let customerDisplay = matchedTicket.customerPhone;
         if (customerDisplay.length > 13) customerDisplay = 'Chat de WhatsApp';
         else customerDisplay = `+${customerDisplay}`;
 
-        const confirmMsg = `✅ *Cotización #${matchedTicket.id} enviada con éxito al cliente (${customerDisplay}).*\n\n` +
+        const actionText = isCorrection ? 'CORREGIDA y enviada' : 'enviada con éxito';
+        const confirmMsg = `✅ *Cotización #${matchedTicket.id} ${actionText} al cliente (${customerDisplay}).*\n\n` +
             `🚗 *Vehículo:* ${matchedTicket.vehicle}\n` +
             `🔧 *Trabajo:* ${matchedTicket.service}\n` +
             `💵 *Valor enviado:* ${cleanQuote}\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `*(Si el cliente hace preguntas adicionales, te notificaré aquí).*`;
 
-        await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, confirmMsg);
-        console.log(`[QUOTES] Cotización #${matchedTicket.id} respondida por Arias y remitida a ${customerDisplay}`);
+        const sentConfirm = await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, confirmMsg);
+        if (sentConfirm?.key?.id) {
+            matchedTicket.confirmMessageId = sentConfirm.key.id;
+            this.saveQuotes();
+        }
+
+        console.log(`[QUOTES] Cotización #${matchedTicket.id} ${actionText} a ${customerDisplay}`);
         return true;
     }
 

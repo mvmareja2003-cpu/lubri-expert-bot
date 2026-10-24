@@ -202,12 +202,12 @@ export const parseMechanicVoiceQuote = async (rawText: string): Promise<string> 
       messages: [
         {
           role: 'system',
-          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico especialista del taller, envió una nota de voz o mensaje cotizando un trabajo. Extrae el PRECIO en pesos colombianos (ej: 140.000 COP) y los detalles técnicos que mencione (ej: mano de obra, qué incluye). Genera una sola línea corta, limpia y profesional para mostrarle al cliente en el campo Valor de la cotización. NUNCA uses asteriscos. Ejemplo: si dice "eso sale en 140 mil con mano de obra", responde: "140.000 COP (incluye mano de obra)". Si solo dijo un número, responde solo el valor: "120.000 COP".'
+          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico especialista del taller, envió una nota de voz o mensaje cotizando o corrigiendo un trabajo. Extrae el PRECIO en pesos colombianos (ej: 140.000 COP) y los detalles o desgloses que mencione (ej: mano de obra, repuesto, correa, qué incluye). Genera una sola línea corta, limpia y profesional para mostrarle al cliente en el campo Valor de la cotización. Si menciona mano de obra y repuesto por separado, desglósalo claramente (ej: "120.000 COP mano de obra + 200.000 COP correa (Total: 320.000 COP)"). NUNCA uses asteriscos.'
         },
         { role: 'user', content: rawText }
       ],
       temperature: 0.1,
-      max_tokens: 80
+      max_tokens: 100
     });
 
     const parsed = response.choices[0]?.message?.content?.trim();
