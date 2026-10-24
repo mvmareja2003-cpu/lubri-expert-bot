@@ -88,20 +88,55 @@ const handleMessage = async (msg: any) => {
         const isGroup = from.endsWith('@g.us');
         if (isGroup) return; // Ignorar grupos
 
-        const senderJid = msg.key.participant || from;
-        const phoneNumber = senderJid.split('@')[0].split(':')[0];
+        const key = msg.key || {};
+        let actualMsg = msg.message;
+        if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
+        else if (actualMsg?.viewOnceMessageV2) actualMsg = actualMsg.viewOnceMessageV2.message;
 
-        const textMessage = msg.message?.conversation || 
-                            msg.message?.extendedTextMessage?.text || 
-                            msg.message?.imageMessage?.caption || 
-                            msg.message?.videoMessage?.caption || '';
+        const quotedStanzaId = actualMsg?.extendedTextMessage?.contextInfo?.stanzaId;
+
+        const textMessage = actualMsg?.conversation || 
+                            actualMsg?.extendedTextMessage?.text || 
+                            actualMsg?.imageMessage?.caption || 
+                            actualMsg?.videoMessage?.caption || '';
+
+        // Extraer número de teléfono real del cliente (desenredando LIDs @lid de WhatsApp)
+        let phoneNumber = '';
+        const candidates = [
+            key.remoteJidAlt,
+            key.participantAlt,
+            key.remoteJid,
+            key.participant,
+            msg.participant
+        ];
+
+        for (const c of candidates) {
+            if (c && typeof c === 'string' && (c.includes('@s.whatsapp.net') || c.includes('@c.us'))) {
+                const clean = c.split('@')[0].split(':')[0].replace(/\D/g, '');
+                if (clean.length >= 10 && clean.length <= 13) {
+                    phoneNumber = clean;
+                    break;
+                }
+            }
+        }
+
+        // Si todavía no hay número y es un @lid, consultar al almacén de Baileys
+        if (!phoneNumber && from.includes('@lid') && (sock as any)?.signalRepository?.lidMapping?.getPNForLID) {
+            try {
+                const pnJid = await (sock as any).signalRepository.lidMapping.getPNForLID(from);
+                if (pnJid) {
+                    phoneNumber = pnJid.split('@')[0].split(':')[0].replace(/\D/g, '');
+                }
+            } catch (e) { }
+        }
+
+        if (!phoneNumber) {
+            phoneNumber = (key.participant || from).split('@')[0].split(':')[0].replace(/\D/g, '');
+        }
 
         // Si el mensaje proviene de Arias el técnico (+57 314 778 5316), procesar cotización
-        if (quotesService.isMechanic(phoneNumber)) {
-            let actualMsg = msg.message;
-            if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
-            const quotedStanzaId = actualMsg?.extendedTextMessage?.contextInfo?.stanzaId;
-            console.log(`[COTIZADOR ARIAS] Mensaje recibido de Arias (+${phoneNumber}): "${textMessage}" (Quoted ID: ${quotedStanzaId || 'ninguno'})`);
+        if (quotesService.isMechanic(phoneNumber, from, quotedStanzaId, textMessage)) {
+            console.log(`[COTIZADOR ARIAS] Mensaje reconocido de Arias (Tel/ID: ${phoneNumber}, JID: ${from}): "${textMessage}" (Quoted ID: ${quotedStanzaId || 'ninguno'})`);
             await quotesService.handleMechanicMessage(from, textMessage, quotedStanzaId);
             return;
         }

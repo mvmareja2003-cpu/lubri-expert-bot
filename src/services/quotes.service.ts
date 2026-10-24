@@ -24,6 +24,7 @@ class QuotesService {
     private nextId: number = 101;
     public mechanicPhone: string = process.env.MECHANIC_PHONE || '573147785316';
     public ownerPhone: string = process.env.OWNER_PHONE || '573016593654';
+    public mechanicJid: string = '';
 
     constructor() {
         this.loadQuotes();
@@ -35,6 +36,7 @@ class QuotesService {
                 const data = JSON.parse(fs.readFileSync(quotesFilePath, 'utf8'));
                 this.tickets = data.tickets || {};
                 this.nextId = data.nextId || 101;
+                this.mechanicJid = data.mechanicJid || '';
             }
         } catch (err) {
             console.error('[QUOTES SERVICE] Error cargando quotes.json:', err);
@@ -47,7 +49,8 @@ class QuotesService {
         try {
             fs.writeFileSync(quotesFilePath, JSON.stringify({
                 tickets: this.tickets,
-                nextId: this.nextId
+                nextId: this.nextId,
+                mechanicJid: this.mechanicJid
             }, null, 2), 'utf8');
         } catch (err) {
             console.error('[QUOTES SERVICE] Error guardando quotes.json:', err);
@@ -55,12 +58,59 @@ class QuotesService {
     }
 
     /**
-     * Verifica si el número que envía el mensaje es Arias el técnico
+     * Verifica si el mensaje proviene de Arias el técnico
+     * Identifica por teléfono, JID almacenado, mensaje citado de ticket, o comando de ticket
      */
-    public isMechanic(phone: string): boolean {
+    public isMechanic(
+        phone: string,
+        jid?: string,
+        quotedStanzaId?: string,
+        textMessage?: string
+    ): boolean {
         const cleanPhone = phone.replace(/\D/g, '');
         const cleanMechanic = this.mechanicPhone.replace(/\D/g, '');
-        return cleanPhone === cleanMechanic || cleanPhone.endsWith(cleanMechanic.slice(-10));
+
+        // 1. Coincidencia por teléfono directo (+57 314 778 5316)
+        if (cleanPhone && (cleanPhone === cleanMechanic || cleanPhone.endsWith(cleanMechanic.slice(-10)))) {
+            if (jid) {
+                this.mechanicJid = jid;
+                this.saveQuotes();
+            }
+            return true;
+        }
+
+        // 2. Coincidencia por JID / LID previamente aprendido de Arias
+        if (jid && this.mechanicJid && jid === this.mechanicJid) {
+            return true;
+        }
+
+        // 3. Coincidencia por mensaje citado (Arias hizo swipe / citar en WhatsApp al ticket enviado)
+        if (quotedStanzaId) {
+            const hasMatchedTicket = Object.values(this.tickets).some(
+                t => t.mechanicMessageId === quotedStanzaId
+            );
+            if (hasMatchedTicket) {
+                if (jid) {
+                    this.mechanicJid = jid;
+                    this.saveQuotes();
+                }
+                return true;
+            }
+        }
+
+        // 4. Coincidencia por comando explícito de ticket (#101, #102...)
+        if (textMessage) {
+            const match = textMessage.match(/^#?(\d{3,4})\b/);
+            if (match && this.tickets[match[1]]) {
+                if (jid) {
+                    this.mechanicJid = jid;
+                    this.saveQuotes();
+                }
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -91,12 +141,19 @@ class QuotesService {
         this.tickets[id] = ticket;
         this.saveQuotes();
 
+        let displayPhone = ticket.customerPhone;
+        if (displayPhone.length > 13) {
+            displayPhone = 'Chat directo (WhatsApp)';
+        } else {
+            displayPhone = `+${displayPhone}`;
+        }
+
         // Enviar ticket a Arias el técnico
         const mechanicMsg = `🔔 *NUEVA SOLICITUD DE COTIZACIÓN #${id}*\n\n` +
             `🚗 *Vehículo:* ${ticket.vehicle}\n` +
             `🔧 *Trabajo a cotizar:* ${ticket.service}\n` +
             `💬 *Detalle:* ${ticket.details}\n` +
-            `📱 *Cliente:* +${ticket.customerPhone}\n` +
+            `📱 *Cliente:* ${displayPhone}\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `👉 *Para cotizar, responde/cita este mensaje o escribe:*\n` +
             `*#${id} [Precio] [Detalle opcional]*\n\n` +
@@ -104,13 +161,14 @@ class QuotesService {
             `• Desliza este mensaje y pon: \`140.000 mano de obra\`\n` +
             `• O escribe: \`#${id} 140.000\``;
 
-        const sent = await sendWhatsAppMessage(this.mechanicPhone, mechanicMsg);
+        const targetArias = this.mechanicJid || this.mechanicPhone;
+        const sent = await sendWhatsAppMessage(targetArias, mechanicMsg);
         if (sent?.key?.id) {
             ticket.mechanicMessageId = sent.key.id;
             this.saveQuotes();
         }
 
-        console.log(`[QUOTES] Ticket #${id} creado para +${customerPhone}. Notificado a Arias (+${this.mechanicPhone}).`);
+        console.log(`[QUOTES] Ticket #${id} creado para ${displayPhone}. Notificado a Arias (${targetArias}).`);
         return ticket;
     }
 
@@ -175,8 +233,14 @@ class QuotesService {
             .replace(/^[:\-,\s]+/, '')
             .trim();
 
+        // Limpiar frases introductorias comunes como "el cambio de amortiguadores vale $120.000"
+        cleanQuote = cleanQuote
+            .replace(/^(el\s+trabajo|el\s+servicio|el\s+cambio(\s+de\s+[^,]+)?)\s+(vale|sale\s+en|cuesta|es\s+de)\s*/i, '')
+            .replace(/^(vale|sale\s+en|cuesta|es\s+de)\s*/i, '')
+            .trim();
+
         if (!cleanQuote) {
-            await sendWhatsAppMessage(this.mechanicPhone, `⚠️ Por favor indica el valor o detalle para el ticket #${matchedTicket.id}. Ejemplo: \`#${matchedTicket.id} 120.000 mano de obra\``);
+            await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, `⚠️ Por favor indica el valor o detalle para el ticket #${matchedTicket.id}. Ejemplo: \`#${matchedTicket.id} 120.000 mano de obra\``);
             return true;
         }
 
@@ -205,18 +269,29 @@ class QuotesService {
                 `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio (de lunes a sábado) 🚗 ¿Te gustaría agendar tu cita para hoy o mañana?`;
         }
 
+        // Enviar respuesta al cliente
         await sendWhatsAppMessage(matchedTicket.customerJid, clientMsg);
+        if (matchedTicket.customerPhone && matchedTicket.customerPhone.startsWith('57') && matchedTicket.customerPhone.length === 12) {
+            const phoneJid = `${matchedTicket.customerPhone}@s.whatsapp.net`;
+            if (phoneJid !== matchedTicket.customerJid) {
+                await sendWhatsAppMessage(phoneJid, clientMsg);
+            }
+        }
 
         // 3. Confirmar a Arias el técnico
-        const confirmMsg = `✅ *Cotización #${matchedTicket.id} enviada con éxito al cliente (+${matchedTicket.customerPhone}).*\n` +
+        let customerDisplay = matchedTicket.customerPhone;
+        if (customerDisplay.length > 13) customerDisplay = 'Chat de WhatsApp';
+        else customerDisplay = `+${customerDisplay}`;
+
+        const confirmMsg = `✅ *Cotización #${matchedTicket.id} enviada con éxito al cliente (${customerDisplay}).*\n\n` +
             `🚗 *Vehículo:* ${matchedTicket.vehicle}\n` +
             `🔧 *Trabajo:* ${matchedTicket.service}\n` +
             `💵 *Valor enviado:* ${cleanQuote}\n` +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `*(Si el cliente hace preguntas adicionales, te notificaré aquí).*`;
 
-        await sendWhatsAppMessage(this.mechanicPhone, confirmMsg);
-        console.log(`[QUOTES] Cotización #${matchedTicket.id} respondida por Arias y remitida a +${matchedTicket.customerPhone}`);
+        await sendWhatsAppMessage(this.mechanicJid || this.mechanicPhone, confirmMsg);
+        console.log(`[QUOTES] Cotización #${matchedTicket.id} respondida por Arias y remitida a ${customerDisplay}`);
         return true;
     }
 
