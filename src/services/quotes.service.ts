@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { sendWhatsAppMessage } from './whatsapp.service';
+import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppDocument } from './whatsapp.service';
 import { parseMechanicVoiceQuote, appendConversationMessage } from './ai.service';
 
 export interface QuoteTicket {
@@ -174,6 +174,56 @@ class QuotesService {
     }
 
     /**
+     * Busca un ticket asignado a Arias según cita, comando o contexto
+     */
+    public findMechanicTicket(quotedStanzaId?: string, textMessage?: string): QuoteTicket | null {
+        const cleanText = textMessage ? textMessage.trim() : '';
+
+        // A) Por cita/deslizar mensaje en WhatsApp
+        if (quotedStanzaId) {
+            const byQuote = Object.values(this.tickets).find(
+                t => t.mechanicMessageId === quotedStanzaId || t.confirmMessageId === quotedStanzaId
+            );
+            if (byQuote) return byQuote;
+        }
+
+        // B) Por comando explícito (#101, # 101, ticket 101)
+        if (cleanText) {
+            const match = cleanText.match(/(?:#|ticket\s*#?)\s*(\d{3,4})\b/i);
+            if (match && this.tickets[match[1]]) {
+                return this.tickets[match[1]];
+            }
+        }
+
+        // C) Si empieza directamente por el número del ticket (ej: "101 140.000")
+        if (cleanText) {
+            const matchStart = cleanText.match(/^(\d{3,4})\b/);
+            if (matchStart && this.tickets[matchStart[1]]) {
+                return this.tickets[matchStart[1]];
+            }
+        }
+
+        // D) Por contexto inteligente
+        const pendingTickets = Object.values(this.tickets)
+            .filter(t => t.status === 'PENDING')
+            .sort((a, b) => b.updatedAt - a.updatedAt);
+
+        if (pendingTickets.length === 1) {
+            return pendingTickets[0];
+        } else if (pendingTickets.length === 0) {
+            const recentTickets = Object.values(this.tickets)
+                .filter(t => (Date.now() - t.updatedAt < 2 * 60 * 60 * 1000))
+                .sort((a, b) => b.updatedAt - a.updatedAt);
+
+            if (recentTickets.length > 0) {
+                return recentTickets[0];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Procesa la respuesta de Arias el técnico
      */
     public async handleMechanicMessage(
@@ -184,52 +234,7 @@ class QuotesService {
         const cleanText = textMessage.trim();
 
         // 1. Buscar ticket:
-        let matchedTicket: QuoteTicket | null = null;
-
-        // A) Por cita/deslizar mensaje en WhatsApp (sea el ticket inicial o la confirmación)
-        if (quotedStanzaId) {
-            matchedTicket = Object.values(this.tickets).find(
-                t => t.mechanicMessageId === quotedStanzaId || t.confirmMessageId === quotedStanzaId
-            ) || null;
-        }
-
-        // B) Por comando explícito (#101, # 101, ticket 101)
-        if (!matchedTicket) {
-            const match = cleanText.match(/(?:#|ticket\s*#?)\s*(\d{3,4})\b/i);
-            if (match && this.tickets[match[1]]) {
-                matchedTicket = this.tickets[match[1]];
-            }
-        }
-
-        // C) Si empieza directamente por el número del ticket (ej: "101 140.000")
-        if (!matchedTicket) {
-            const matchStart = cleanText.match(/^(\d{3,4})\b/);
-            if (matchStart && this.tickets[matchStart[1]]) {
-                matchedTicket = this.tickets[matchStart[1]];
-            }
-        }
-
-        // D) Si no puso número de ticket: buscar contexto inteligente
-        if (!matchedTicket) {
-            // Prioridad D1: Si hay tickets PENDING
-            const pendingTickets = Object.values(this.tickets)
-                .filter(t => t.status === 'PENDING')
-                .sort((a, b) => b.updatedAt - a.updatedAt);
-
-            if (pendingTickets.length === 1) {
-                matchedTicket = pendingTickets[0];
-            } else if (pendingTickets.length === 0) {
-                // Prioridad D2: Si no hay PENDING pero hay tickets recientemente atendidos en las últimas 2 horas
-                // (como cuando Arias corrige o aclara un valor enviado hace unos minutos)
-                const recentTickets = Object.values(this.tickets)
-                    .filter(t => (Date.now() - t.updatedAt < 2 * 60 * 60 * 1000))
-                    .sort((a, b) => b.updatedAt - a.updatedAt);
-
-                if (recentTickets.length > 0) {
-                    matchedTicket = recentTickets[0];
-                }
-            }
-        }
+        let matchedTicket: QuoteTicket | null = this.findMechanicTicket(quotedStanzaId, textMessage);
 
         // Si no se encuentra el ticket
         if (!matchedTicket) {
@@ -406,6 +411,77 @@ class QuotesService {
             ticket.updatedAt = Date.now();
             this.saveQuotes();
         }
+    }
+
+    /**
+     * Reenvía una foto o documento del cliente a Arias el técnico (+57 314 778 5316)
+     */
+    public async forwardCustomerMedia(
+        ticket: QuoteTicket,
+        mediaPath: string,
+        isDocument: boolean = false,
+        filename: string = 'documento.pdf',
+        customerComment: string = ''
+    ): Promise<boolean> {
+        let displayPhone = ticket.customerPhone;
+        if (displayPhone.length > 13) displayPhone = 'Chat de WhatsApp';
+        else displayPhone = `+${displayPhone}`;
+
+        const ariasCaption = `📸 *FOTO / DOCUMENTO DEL CLIENTE - TICKET #${ticket.id}*\n\n` +
+            `🚗 *Vehículo:* ${ticket.vehicle}\n` +
+            `🔧 *Trabajo inicial:* ${ticket.service}\n` +
+            `📱 *Cliente:* ${displayPhone}\n` +
+            (customerComment ? `💬 *Mensaje del cliente:* "${customerComment}"\n` : '') +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `👉 *Arias, aquí tienes la foto/documento enviada por el cliente para la cotización de repuestos o revisión.*\n` +
+            `*(Para responder, desliza esta imagen con audio o texto: \`#${ticket.id} [Valor/Notas]\`)*`;
+
+        const targetArias = this.mechanicJid || this.mechanicPhone;
+        let sent: any = null;
+        if (isDocument) {
+            sent = await sendWhatsAppDocument(targetArias, mediaPath, filename, ariasCaption);
+        } else {
+            sent = await sendWhatsAppImage(targetArias, mediaPath, ariasCaption);
+        }
+
+        if (sent?.key?.id) {
+            ticket.mechanicMessageId = sent.key.id;
+            ticket.updatedAt = Date.now();
+            this.saveQuotes();
+        }
+
+        console.log(`[QUOTES] Foto/documento del ticket #${ticket.id} reenviada exitosamente a Arias (${targetArias})`);
+        return true;
+    }
+
+    /**
+     * Reenvía una foto o documento de Arias al cliente
+     */
+    public async forwardMechanicMediaToCustomer(
+        ticket: QuoteTicket,
+        mediaPath: string,
+        isDocument: boolean = false,
+        filename: string = 'documento.pdf',
+        mechanicCaption: string = ''
+    ): Promise<boolean> {
+        const targetCustomer = ticket.customerJid || `${ticket.customerPhone}@s.whatsapp.net`;
+        const clientCaption = `¡Hola! Arias, nuestro técnico especialista, te comparte esta imagen respecto a la cotización de tu ${ticket.vehicle}:\n\n` +
+            (mechanicCaption ? `🔧 ${mechanicCaption}\n\n` : '') +
+            `¿Tienes alguna duda o te gustaría agendar tu cita? 🚗`;
+
+        if (isDocument) {
+            await sendWhatsAppDocument(targetCustomer, mediaPath, filename, clientCaption);
+        } else {
+            await sendWhatsAppImage(targetCustomer, mediaPath, clientCaption);
+        }
+
+        appendConversationMessage(ticket.customerPhone, 'assistant', clientCaption);
+        if (ticket.customerJid && ticket.customerJid !== ticket.customerPhone) {
+            appendConversationMessage(ticket.customerJid, 'assistant', clientCaption);
+        }
+
+        console.log(`[QUOTES] Foto de Arias reenviada al cliente (${ticket.customerPhone})`);
+        return true;
     }
 }
 

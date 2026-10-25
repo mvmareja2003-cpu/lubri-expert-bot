@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
-import { getAiResponse, transcribeAudio } from './services/ai.service';
+import { getAiResponse, transcribeAudio, appendConversationMessage } from './services/ai.service';
 import { sock, initWhatsAppClient, sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppDocument, downloadWhatsAppMedia } from './services/whatsapp.service';
 import { quotesService } from './services/quotes.service';
 
@@ -101,50 +101,10 @@ const handleMessage = async (msg: any) => {
         if (actualMsg?.ephemeralMessage) actualMsg = actualMsg.ephemeralMessage.message;
         else if (actualMsg?.viewOnceMessageV2) actualMsg = actualMsg.viewOnceMessageV2.message;
 
-        const contextInfo = actualMsg?.extendedTextMessage?.contextInfo || actualMsg?.audioMessage?.contextInfo;
+        const contextInfo = actualMsg?.extendedTextMessage?.contextInfo || actualMsg?.audioMessage?.contextInfo || actualMsg?.imageMessage?.contextInfo || actualMsg?.documentMessage?.contextInfo;
         const quotedStanzaId = contextInfo?.stanzaId;
 
-        let textMessage = actualMsg?.conversation || 
-                          actualMsg?.extendedTextMessage?.text || 
-                          actualMsg?.imageMessage?.caption || 
-                          actualMsg?.videoMessage?.caption || '';
-
-        // Si es una nota de voz o audio (del cliente o de Arias), transcribir primero con Whisper
-        if (actualMsg?.audioMessage) {
-            console.log(`[AUDIO] Recibido audio de ${from}. Descargando y transcribiendo con Whisper...`);
-            const audioPath = await downloadWhatsAppMedia(msg);
-            if (audioPath) {
-                const transcribedText = await transcribeAudio(audioPath);
-                try { fs.unlinkSync(audioPath); } catch (e) { }
-
-                if (transcribedText) {
-                    textMessage = transcribedText;
-                    console.log(`[AUDIO TRANSCRITO] ${from}: "${textMessage}"`);
-                } else {
-                    await sendWhatsAppMessage(from, 'Disculpa, no pude entender claramente la nota de voz. ¿Podrías escribirla por favor? 🚗');
-                    return;
-                }
-            } else {
-                await sendWhatsAppMessage(from, 'Disculpa, tuve un problema al descargar el audio. ¿Podrías escribirme? 🚗');
-                return;
-            }
-        } else if (actualMsg?.imageMessage || actualMsg?.documentMessage) {
-            const now = Date.now();
-            const photoPhone = (key.remoteJidAlt || from).split('@')[0].split(':')[0].replace(/\D/g, '');
-            if (lastImageReply[photoPhone] && (now - lastImageReply[photoPhone] < 60000)) return;
-            lastImageReply[photoPhone] = now;
-
-            const ownerPhone = process.env.OWNER_PHONE || '573016593654';
-            const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${photoPhone}\n📄 *Motivo:* Envió una foto o documento (tarjeta de propiedad, daño o comprobante).\n\n👉 *Abrir chat directo:* https://wa.me/${photoPhone}`;
-            await sendWhatsAppMessage(ownerPhone, alertMsg);
-
-            await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
-            return;
-        }
-
-        if (!textMessage || textMessage.trim().length === 0) return;
-
-        // Extraer número de teléfono real del cliente (desenredando LIDs @lid de WhatsApp)
+        // Extraer número de teléfono real del remitente (desenredando LIDs @lid de WhatsApp)
         let phoneNumber = '';
         const candidates = [
             key.remoteJidAlt,
@@ -177,6 +137,96 @@ const handleMessage = async (msg: any) => {
         if (!phoneNumber) {
             phoneNumber = (key.participant || from).split('@')[0].split(':')[0].replace(/\D/g, '');
         }
+
+        let textMessage = actualMsg?.conversation || 
+                          actualMsg?.extendedTextMessage?.text || 
+                          actualMsg?.imageMessage?.caption || 
+                          actualMsg?.videoMessage?.caption || 
+                          actualMsg?.documentMessage?.caption || '';
+
+        // Si es una nota de voz o audio (del cliente o de Arias), transcribir primero con Whisper
+        if (actualMsg?.audioMessage) {
+            console.log(`[AUDIO] Recibido audio de ${from}. Descargando y transcribiendo con Whisper...`);
+            const audioPath = await downloadWhatsAppMedia(msg);
+            if (audioPath) {
+                const transcribedText = await transcribeAudio(audioPath);
+                try { fs.unlinkSync(audioPath); } catch (e) { }
+
+                if (transcribedText) {
+                    textMessage = transcribedText;
+                    console.log(`[AUDIO TRANSCRITO] ${from}: "${textMessage}"`);
+                } else {
+                    await sendWhatsAppMessage(from, 'Disculpa, no pude entender claramente la nota de voz. ¿Podrías escribirla por favor? 🚗');
+                    return;
+                }
+            } else {
+                await sendWhatsAppMessage(from, 'Disculpa, tuve un problema al descargar el audio. ¿Podrías escribirme? 🚗');
+                return;
+            }
+        } else if (actualMsg?.imageMessage || actualMsg?.documentMessage) {
+            console.log(`[MEDIA] Recibido archivo/foto de ${from} (+${phoneNumber}). Descargando...`);
+            const mediaPath = await downloadWhatsAppMedia(msg);
+            const isDoc = !!actualMsg?.documentMessage;
+            const filename = actualMsg?.documentMessage?.fileName || (isDoc ? 'documento.pdf' : 'foto.jpg');
+
+            const isArias = quotesService.isMechanic(phoneNumber, from, quotedStanzaId, textMessage);
+
+            if (isArias) {
+                // Si Arias envía una foto o documento para el cliente:
+                const matchedTicket = quotesService.findMechanicTicket(quotedStanzaId, textMessage);
+                if (matchedTicket && mediaPath) {
+                    await quotesService.forwardMechanicMediaToCustomer(matchedTicket, mediaPath, isDoc, filename, textMessage);
+                    try { fs.unlinkSync(mediaPath); } catch (e) { }
+                    await sendWhatsAppMessage(quotesService.mechanicJid || quotesService.mechanicPhone, `✅ Foto/documento del ticket #${matchedTicket.id} enviada al cliente.`);
+                    return;
+                }
+            } else {
+                // Mensaje proviene de un cliente:
+                const activeTicket = quotesService.getActiveCustomerTicket(from, phoneNumber);
+
+                if (activeTicket && mediaPath) {
+                    // ¡EL CLIENTE TIENE UN TICKET CON ARIAS! Reenviar la foto DIRECTAMENTE a Arias
+                    console.log(`[MEDIA] Cliente +${phoneNumber} envió foto/documento con ticket activo #${activeTicket.id}. Reenviando a Arias...`);
+                    await quotesService.forwardCustomerMedia(activeTicket, mediaPath, isDoc, filename, textMessage);
+
+                    // Notificar también al dueño de Lubri Expert para respaldo
+                    const ownerPhone = process.env.OWNER_PHONE || '573016593654';
+                    const alertMsg = `📸 *FOTO / DOCUMENTO RECIBIDO DEL CLIENTE - TICKET #${activeTicket.id}*\n\n` +
+                        `🚗 *Vehículo:* ${activeTicket.vehicle}\n` +
+                        `🔧 *Servicio:* ${activeTicket.service}\n` +
+                        `📱 *Cliente:* +${phoneNumber}\n` +
+                        `👉 *Reenviada automáticamente a Arias para cotizar repuestos/revisión.*`;
+                    if (isDoc) {
+                        await sendWhatsAppDocument(ownerPhone, mediaPath, filename, alertMsg);
+                    } else {
+                        await sendWhatsAppImage(ownerPhone, mediaPath, alertMsg);
+                    }
+
+                    try { fs.unlinkSync(mediaPath); } catch (e) { }
+
+                    const replyMsg = `¡Muchas gracias por la foto! 📸 Ya se la compartí directamente a Arias, nuestro técnico especialista, para revisar los repuestos y detalles de tu ${activeTicket.vehicle}. En unos momentos te confirmamos la información 🚗`;
+                    await sendWhatsAppMessage(from, replyMsg);
+                    appendConversationMessage(phoneNumber, 'assistant', replyMsg);
+                    return;
+                } else if (mediaPath) {
+                    // Si no tiene ticket activo con Arias, enviar al asesor humano / dueño
+                    const ownerPhone = process.env.OWNER_PHONE || '573016593654';
+                    const alertMsg = `🚨 *¡ATENCIÓN HUMANA REQUERIDA - LUBRI EXPERT!* 🚨\n\n📱 *Cliente:* +${phoneNumber}\n📄 *Motivo:* Envió una foto o documento (tarjeta de propiedad, daño o comprobante).\n\n👉 *Abrir chat directo:* https://wa.me/${phoneNumber}`;
+                    if (isDoc) {
+                        await sendWhatsAppDocument(ownerPhone, mediaPath, filename, alertMsg);
+                    } else {
+                        await sendWhatsAppImage(ownerPhone, mediaPath, alertMsg);
+                    }
+                    try { fs.unlinkSync(mediaPath); } catch (e) { }
+
+                    await sendWhatsAppMessage(from, 'Muchas gracias por la foto. Nuestro asesor de servicio la revisará en breve 🚗');
+                    return;
+                }
+            }
+            return;
+        }
+
+        if (!textMessage || textMessage.trim().length === 0) return;
 
         // Si el mensaje proviene de Arias el técnico (+57 314 778 5316), procesar cotización
         if (quotesService.isMechanic(phoneNumber, from, quotedStanzaId, textMessage)) {

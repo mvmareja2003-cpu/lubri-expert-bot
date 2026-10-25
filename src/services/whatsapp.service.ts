@@ -89,31 +89,47 @@ export const sendWhatsAppMessage = async (to: string, body: string): Promise<any
     }
 };
 
-export const sendWhatsAppImage = async (to: string, filePath: string) => {
+export const sendWhatsAppImage = async (to: string, filePath: string, caption?: string): Promise<any> => {
     try {
-        if (!sock) return;
+        if (!sock) {
+            console.log(`[WhatsApp no conectado] Simulación imagen a ${to}: ${caption || ''}`);
+            return null;
+        }
         let chatId = to;
         if (to.includes('@c.us')) chatId = to.replace('@c.us', '@s.whatsapp.net');
         else if (!to.includes('@')) chatId = `${to.replace(/\D/g, '')}@s.whatsapp.net`;
         
-        await sock.sendMessage(chatId, { image: fs.readFileSync(filePath) });
+        const payload: any = { image: fs.readFileSync(filePath) };
+        if (caption) payload.caption = caption;
+
+        const sent = await sock.sendMessage(chatId, payload);
         console.log(`[Baileys] Imagen enviada a ${chatId}`);
+        return sent;
     } catch (error: any) {
         console.error(`[Baileys] Error enviando imagen a ${to}:`, error);
+        return null;
     }
 };
 
-export const sendWhatsAppDocument = async (to: string, filePath: string, filename: string) => {
+export const sendWhatsAppDocument = async (to: string, filePath: string, filename: string, caption?: string): Promise<any> => {
     try {
-        if (!sock) return;
+        if (!sock) {
+            console.log(`[WhatsApp no conectado] Simulación documento a ${to}: ${filename}`);
+            return null;
+        }
         let chatId = to;
         if (to.includes('@c.us')) chatId = to.replace('@c.us', '@s.whatsapp.net');
         else if (!to.includes('@')) chatId = `${to.replace(/\D/g, '')}@s.whatsapp.net`;
         
-        await sock.sendMessage(chatId, { document: fs.readFileSync(filePath), mimetype: 'application/pdf', fileName: filename });
+        const payload: any = { document: fs.readFileSync(filePath), mimetype: 'application/pdf', fileName: filename };
+        if (caption) payload.caption = caption;
+
+        const sent = await sock.sendMessage(chatId, payload);
         console.log(`[Baileys] Documento enviado a ${chatId}`);
+        return sent;
     } catch (error: any) {
         console.error(`[Baileys] Error enviando documento a ${to}:`, error);
+        return null;
     }
 };
 
