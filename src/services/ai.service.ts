@@ -131,7 +131,9 @@ REGLA DE ORO 11 (COHERENCIA Y CONGRUENCIA EN CITAS Y DISPONIBILIDAD DE ARIAS):
   Cuando el cliente pregunte "¿Cuándo lo puedo llevar?", "¿A qué hora?", "¿Para cuándo hay cita?", "¿Tiene cupo?", "¿Para hoy?", DEBES responder con TOTAL COHERENCIA confirmando la disponibilidad que Arias indicó:
   "Arias nos indicó que tiene disponibilidad para atender tu vehículo el [Día y Hora indicada por Arias] 🚗 ¿Te agendamos para esa hora o prefieres otro momento?".
 - NUNCA respondas con recomendaciones genéricas de horario valle si Arias ya informó una hora o día específico para esa cotización.
-- Si Arias NO mencionó hora específica en la cotización, pregúntale al cliente qué día y hora le queda más cómodo entre lunes y sábado (7:00 am a 4:15 pm entre semana, 7:00 am a 3:45 pm sábados).
+REGLA DE ORO 12 (NOTAS, DIAGNÓSTICOS Y EXPLICACIONES TÉCNICAS DE ARIAS):
+- Si Arias incluye una nota o explicación técnica en la cotización (ej: diagnóstico sobre causas de vibración o ruido, recomendación de revisión sin costo en taller, advertencia sobre cambio de copelas/repuestos):
+  DEBES mantener total coherencia con dicha explicación cuando el cliente pregunte detalles sobre su vehículo o la cotización.
 
 ESTA ES LA INFORMACIÓN OFICIAL Y TARIFAS DE LUBRI EXPERT:
 ${kb}
@@ -170,6 +172,7 @@ interface ChatMessage {
 export interface MechanicQuoteExtraction {
   price: string;
   availability?: string | null;
+  notes?: string | null;
 }
 
 const conversations: Record<string, ChatMessage[]> = {};
@@ -266,7 +269,7 @@ export const transcribeAudio = async (filePath: string): Promise<string | null> 
  */
 export const parseMechanicVoiceQuote = async (rawText: string): Promise<MechanicQuoteExtraction> => {
   const openai = getOpenAIClient();
-  if (!openai) return { price: rawText, availability: null };
+  if (!openai) return { price: rawText, availability: null, notes: null };
 
   try {
     const response = await openai.chat.completions.create({
@@ -274,26 +277,28 @@ export const parseMechanicVoiceQuote = async (rawText: string): Promise<Mechanic
       messages: [
         {
           role: 'system',
-          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico, envió una cotización o corrección por audio o texto. Extrae un objeto JSON con dos campos:\n' +
-            '- price: El valor o desglose limpio en pesos COP (ej: "180.000 COP total (60.000 COP discos + 70.000 COP campanas)" o "140.000 COP mano de obra"). Si menciona mano de obra y repuesto por separado, desglósalo claramente con el total. NUNCA uses asteriscos.\n' +
-            '- availability: Si mencionó día u hora de disponibilidad para atender la cita (ej: "Miércoles a las 4:00 PM", "Mañana a las 9:00 AM", "Martes por la tarde"), extráelo formalmente. Si NO mencionó disponibilidad u horario, pon null.\n' +
-            'Devuelve ESTRICTAMENTE JSON con esas dos llaves: price y availability.'
+          content: 'Eres el asistente de Lubri Expert. Arias, el mecánico técnico, envió una cotización, explicación o nota por audio o texto. Extrae un objeto JSON con tres campos:\n' +
+            '- price: El valor o desglose limpio en pesos COP (ej: "180.000 COP total", "15.000 COP por cada llanta balanceada", "140.000 COP mano de obra"). Si menciona que la revisión inicial es sin costo, resúmelo con claridad. NUNCA uses asteriscos.\n' +
+            '- availability: Si mencionó día u hora de disponibilidad para atender la cita (ej: "Miércoles a las 4:00 PM", "Mañana a las 9:00 AM"). Si NO mencionó disponibilidad u horario, pon null.\n' +
+            '- notes: Si Arias dio una explicación técnica, diagnóstico preliminar, recomendaciones, causas de una falla (ej: que las vibraciones pueden ser por balanceo o llantas), invitó a revisión sin costo, o dio aclaraciones para el cliente, redáctalo de manera amable, clara y profesional para el cliente, sin asteriscos. Si Arias SOLO dio el precio seco sin explicaciones ni notas adicionales (ej: "Son 140 mil"), pon null.\n' +
+            'Devuelve ESTRICTAMENTE JSON con esas tres llaves: price, availability y notes.'
         },
         { role: 'user', content: rawText }
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      max_tokens: 150
+      max_tokens: 250
     });
 
     const parsedJson = JSON.parse(response.choices[0]?.message?.content || '{}');
     return {
       price: (parsedJson.price || rawText).replace(/\*/g, '').trim(),
-      availability: parsedJson.availability ? String(parsedJson.availability).replace(/\*/g, '').trim() : null
+      availability: parsedJson.availability ? String(parsedJson.availability).replace(/\*/g, '').trim() : null,
+      notes: parsedJson.notes ? String(parsedJson.notes).replace(/\*/g, '').trim() : null
     };
   } catch (err) {
     console.error('[AI SERVICE] Error parseando nota de voz de Arias:', err);
-    return { price: rawText, availability: null };
+    return { price: rawText, availability: null, notes: null };
   }
 };
 

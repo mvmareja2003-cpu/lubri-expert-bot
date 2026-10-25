@@ -39,6 +39,7 @@ app.post('/api/chat', async (req, res) => {
         let ticketContext: string | undefined = undefined;
         if (activeTicket && activeTicket.status === 'QUOTED') {
             ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
+                (activeTicket.quoteNotes ? ` Nota/Explicación técnica de Arias: ${activeTicket.quoteNotes}.` : '') +
                 (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
         }
 
@@ -216,6 +217,7 @@ const handleMessage = async (msg: any) => {
 
         if (activeTicket && activeTicket.status === 'QUOTED') {
             ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
+                (activeTicket.quoteNotes ? ` Nota/Explicación técnica de Arias: ${activeTicket.quoteNotes}.` : '') +
                 (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
         }
 

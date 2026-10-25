@@ -285,18 +285,23 @@ class QuotesService {
         // Si el mensaje es una frase conversacional o proviene de una nota de voz de Arias, procesar con IA
         let quotePrice = cleanQuote;
         let quoteAvailability: string | null = null;
+        let quoteNotes: string | null = null;
 
-        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile') || cleanQuote.toLowerCase().includes('hora') || cleanQuote.toLowerCase().includes('tarde') || cleanQuote.toLowerCase().includes('mañana') || cleanQuote.toLowerCase().includes('miercoles') || cleanQuote.toLowerCase().includes('miércoles') || isCorrection) {
+        if (cleanQuote.split(' ').length > 2 || cleanQuote.toLowerCase().includes('mil') || cleanQuote.toLowerCase().includes('pesos') || cleanQuote.toLowerCase().includes('dile') || cleanQuote.toLowerCase().includes('explica') || cleanQuote.toLowerCase().includes('revision') || cleanQuote.toLowerCase().includes('revisión') || cleanQuote.toLowerCase().includes('costo') || cleanQuote.toLowerCase().includes('taller') || cleanQuote.toLowerCase().includes('hora') || cleanQuote.toLowerCase().includes('tarde') || cleanQuote.toLowerCase().includes('mañana') || cleanQuote.toLowerCase().includes('miercoles') || cleanQuote.toLowerCase().includes('miércoles') || isCorrection) {
             const aiParsed = await parseMechanicVoiceQuote(cleanQuote);
             if (aiParsed) {
                 quotePrice = (aiParsed.price || cleanQuote).replace(/\*/g, '').trim();
                 quoteAvailability = aiParsed.availability ? aiParsed.availability.replace(/\*/g, '').trim() : null;
+                quoteNotes = aiParsed.notes ? aiParsed.notes.replace(/\*/g, '').trim() : null;
             }
         }
 
         matchedTicket.quotePrice = quotePrice;
         if (quoteAvailability) {
             matchedTicket.availability = quoteAvailability;
+        }
+        if (quoteNotes) {
+            matchedTicket.quoteNotes = quoteNotes;
         }
         matchedTicket.status = 'QUOTED';
         matchedTicket.updatedAt = Date.now();
@@ -308,13 +313,15 @@ class QuotesService {
             clientMsg = `Disculpa, Arias, nuestro técnico especialista, te actualiza el valor exacto para tu ${matchedTicket.vehicle}:\n\n` +
                 `🔧 Servicio: ${matchedTicket.service}\n` +
                 `💵 Valor: ${matchedTicket.quotePrice}\n` +
+                (matchedTicket.quoteNotes ? `💡 Nota del técnico: ${matchedTicket.quoteNotes}\n` : '') +
                 (matchedTicket.availability ? `📅 Disponibilidad de Arias: ${matchedTicket.availability}\n\n` : `\n`) +
                 `¿Te gustaría agendar una cita para esta semana? 🚗`;
         } else {
             clientMsg = `¡Hola! Arias, nuestro técnico especialista, revisó la cotización para tu ${matchedTicket.vehicle}:\n\n` +
                 `🔧 Servicio: ${matchedTicket.service}\n` +
                 `💵 Valor: ${matchedTicket.quotePrice}\n` +
-                (matchedTicket.availability ? `📅 Disponibilidad de Arias: ${matchedTicket.availability}\n\n` : `\n`) +
+                (matchedTicket.quoteNotes ? `💡 Nota del técnico: ${matchedTicket.quoteNotes}\n\n` : '\n') +
+                (matchedTicket.availability ? `📅 Disponibilidad de Arias: ${matchedTicket.availability}\n\n` : '') +
                 (matchedTicket.availability
                     ? `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio 🚗 ¿Te agendamos para esa hora o prefieres otro momento?`
                     : `Recuerda que este trabajo se realiza con garantía técnica en nuestras bahías de servicio (de lunes a sábado) 🚗 ¿Te gustaría agendar tu cita para hoy o mañana?`);
@@ -342,6 +349,7 @@ class QuotesService {
             `🚗 *Vehículo:* ${matchedTicket.vehicle}\n` +
             `🔧 *Trabajo:* ${matchedTicket.service}\n` +
             `💵 *Valor enviado:* ${matchedTicket.quotePrice}\n` +
+            (matchedTicket.quoteNotes ? `💡 *Nota enviada:* ${matchedTicket.quoteNotes}\n` : '') +
             (matchedTicket.availability ? `📅 *Disponibilidad enviada:* ${matchedTicket.availability}\n` : '') +
             `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
             `*(Si el cliente hace preguntas adicionales, te notificaré aquí).*`;
