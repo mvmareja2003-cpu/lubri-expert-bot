@@ -3,9 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
-import { getAiResponse, transcribeAudio, appendConversationMessage } from './services/ai.service';
+import { getAiResponse, transcribeAudio, appendConversationMessage, clearCustomerConversation } from './services/ai.service';
 import { sock, initWhatsAppClient, sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppDocument, downloadWhatsAppMedia } from './services/whatsapp.service';
-import { quotesService } from './services/quotes.service';
+import { quotesService, QuoteTicket } from './services/quotes.service';
 
 dotenv.config();
 
@@ -26,6 +26,78 @@ const humanTakeover: Record<string, number> = {};
 const TAKEOVER_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de pausa para atención humana
 const lastImageReply: Record<string, number> = {};
 
+/**
+ * Detecta si el cliente desea cotizar un vehículo o servicio diferente al ticket activo
+ */
+const detectVehicleSwitch = (cleanText: string, activeTicket: QuoteTicket | null): boolean => {
+    if (!activeTicket) return false;
+    const cleanLower = cleanText.toLowerCase().trim();
+    const switchesVehicle = /(otro\s+(veh[ií]culo|carro|auto|coche|moto|camioneta)|otra\s+cotizaci[oó]n|cot[ií]zame\s+otro|cotizar\s+otro|tengo\s+otro|para\s+otro|cambiar\s+de\s+carro|este\s+es\s+otro|es\s+para\s+otro|cotizar\s+otra\s+cosa)/i.test(cleanLower);
+
+    let mentionsDifferentVehicle = false;
+    if (activeTicket.vehicle) {
+        const ticketVehicleWords = activeTicket.vehicle.toLowerCase().split(/[\s\-_]+/);
+        const knownMakesAndModels = [
+            'renault', 'chevrolet', 'mazda', 'toyota', 'kia', 'hyundai', 'nissan', 'ford',
+            'volkswagen', 'vw', 'suzuki', 'honda', 'mitsubishi', 'subaru', 'peugeot',
+            'citroen', 'fiat', 'jeep', 'dodge', 'ram', 'byd', 'chery', 'jac', 'foton',
+            'great wall', 'haval', 'geely', 'bmw', 'mercedes', 'audi', 'seat', 'skoda',
+            'duster', 'sandero', 'logan', 'stepway', 'kwid', 'clio', 'captur', 'koleos', 'twingo', 'megane', 'scenic', 'symbol',
+            'spark', 'sail', 'aveo', 'onix', 'tracker', 'captiva', 'cruze', 'dmax', 'd-max', 'optra', 'corsa', 'luv', 'beat', 'joy',
+            'cx-3', 'cx-5', 'cx-30', 'cx-50', 'cx-9', 'mazda 2', 'mazda 3', 'mazda 6', 'allegro', 'mileno', 'matsuri',
+            'picanto', 'rio', 'cerato', 'sportage', 'sorento', 'soluto', 'stonic', 'niro', 'seltos',
+            'tucson', 'i10', 'i25', 'i35', 'accent', 'creta', 'getz', 'santa fe', 'elantra', 'kona',
+            'hilux', 'corolla', 'yaris', 'fortuner', 'prado', 'rav4', 'land cruiser', '4runner', 'etios', 'rush',
+            'march', 'versa', 'frontier', 'kicks', 'qashqai', 'sentra', 'tiida', 'xtrail', 'x-trail', 'navara',
+            'gol', 'polo', 'voyage', 'jetta', 'golf', 'amarok', 't-cross', 'nivus', 'taos', 'tiguan', 'fox', 'crossfox', 'vento',
+            'fiesta', 'focus', 'ecosport', 'escape', 'explorer', 'ranger', 'edge', 'f-150', 'f150', 'fusion',
+            'swift', 'vitara', 'grand vitara', 'jimny', 'alto', 'baleno', 's-cross', 'ignis', 'celerio'
+        ];
+        for (const brand of knownMakesAndModels) {
+            const regex = new RegExp(`\\b${brand}\\b`, 'i');
+            if (regex.test(cleanLower) && !ticketVehicleWords.includes(brand)) {
+                mentionsDifferentVehicle = true;
+                break;
+            }
+        }
+    }
+
+    return switchesVehicle || mentionsDifferentVehicle;
+};
+
+/**
+ * Prepara el contexto del ticket activo y maneja el cambio de vehículo o reseteo de contexto
+ */
+const prepareCustomerTicketContext = (
+    from: string,
+    phoneNumber: string,
+    messageText: string
+): { activeTicket: QuoteTicket | null; ticketContext?: string } => {
+    let activeTicket = quotesService.getActiveCustomerTicket(from, phoneNumber);
+    let ticketContext: string | undefined = undefined;
+
+    if (activeTicket) {
+        const isSwitching = detectVehicleSwitch(messageText, activeTicket);
+        if (isSwitching) {
+            console.log(`[COTIZADOR] Cliente +${phoneNumber} solicitó cambio de vehículo o cotizar otro auto. Cerrando ticket #${activeTicket.id} (${activeTicket.vehicle}).`);
+            quotesService.closeTicket(activeTicket.id, 'Cliente solicitó cotizar otro vehículo / tema');
+            clearCustomerConversation(phoneNumber);
+            activeTicket = null;
+            ticketContext = `ATENCIÓN: El cliente desea cotizar un NUEVO vehículo o servicio diferente al anterior. Olvida completamente la cotización previa, el precio previo, la cita o disponibilidad anterior y cualquier nota de fotos anterior. Solicita marca, modelo, año y posición si faltan, y genera de inmediato la etiqueta [SOLICITAR_COTIZACION] en cuanto tengas esos datos.`;
+        } else if (activeTicket.status === 'QUOTED') {
+            let notes = activeTicket.quoteNotes || '';
+            if (activeTicket.photoReceived) {
+                notes = 'Foto del cliente ya fue recibida y compartida con Arias.';
+            }
+            ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
+                (notes ? ` Nota/Explicación técnica de Arias: ${notes}.` : '') +
+                (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
+        }
+    }
+
+    return { activeTicket, ticketContext };
+};
+
 // Endpoint para el simulador web o pruebas locales
 app.post('/api/chat', async (req, res) => {
     try {
@@ -35,15 +107,20 @@ app.post('/api/chat', async (req, res) => {
             return;
         }
 
-        const activeTicket = quotesService.getActiveCustomerTicket(`${phoneNumber}@s.whatsapp.net`, phoneNumber);
-        let ticketContext: string | undefined = undefined;
-        if (activeTicket && activeTicket.status === 'QUOTED') {
-            ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
-                (activeTicket.quoteNotes ? ` Nota/Explicación técnica de Arias: ${activeTicket.quoteNotes}.` : '') +
-                (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
-        }
+        const from = `${phoneNumber}@s.whatsapp.net`;
+        const { activeTicket, ticketContext } = prepareCustomerTicketContext(from, phoneNumber, message);
 
         let aiReply = await getAiResponse(message, phoneNumber, ticketContext);
+
+        const quoteMatch = aiReply.match(/\[SOLICITAR_COTIZACION:\s*([^\|]+)\s*\|\s*([^\|]+)\s*\|\s*([^\]]+)\]/i);
+        if (quoteMatch) {
+            const vehicle = quoteMatch[1].trim();
+            const service = quoteMatch[2].trim();
+            const details = quoteMatch[3].trim();
+            aiReply = aiReply.replace(/\[SOLICITAR_COTIZACION:[^\]]+\]/i, '').trim();
+            await quotesService.createTicket(from, phoneNumber, vehicle, service, details);
+        }
+
         const isHandoff = aiReply.includes('[ESCALAR_HUMANO]');
         if (isHandoff) {
             aiReply = aiReply.replace('[ESCALAR_HUMANO]', '').trim();
@@ -261,15 +338,8 @@ const handleMessage = async (msg: any) => {
 
         console.log(`[MENSAJE] De +${phoneNumber}: "${textMessage}"`);
 
-        // Obtener ticket activo reciente para inyectar contexto si existe
-        const activeTicket = quotesService.getActiveCustomerTicket(from, phoneNumber);
-        let ticketContext: string | undefined = undefined;
-
-        if (activeTicket && activeTicket.status === 'QUOTED') {
-            ticketContext = `Ticket #${activeTicket.id} (${activeTicket.vehicle} - ${activeTicket.service}): Cotizado por Arias en ${activeTicket.quotePrice}.` +
-                (activeTicket.quoteNotes ? ` Nota/Explicación técnica de Arias: ${activeTicket.quoteNotes}.` : '') +
-                (activeTicket.availability ? ` Disponibilidad indicada por Arias: ${activeTicket.availability}.` : ' Arias no indicó hora específica, preguntar al cliente su preferencia.');
-        }
+        // Obtener ticket activo reciente e interpretar contexto o cambio de vehículo
+        const { activeTicket, ticketContext } = prepareCustomerTicketContext(from, phoneNumber, textMessage);
 
         // Obtener respuesta de la IA
         let aiResponse = await getAiResponse(textMessage, phoneNumber, ticketContext);

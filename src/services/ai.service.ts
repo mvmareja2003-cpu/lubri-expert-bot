@@ -76,6 +76,11 @@ REGLA DE ORO 4 (SERVICIOS MECÁNICOS Y COTIZACIONES CON ARIAS EL TÉCNICO):
   * Cuando ya tengas todos los datos completos, responde confirmando al cliente e incluye al final exactamente:
     [SOLICITAR_COTIZACION: Marca Modelo Año | Trabajo con posición exacta (delanteros/traseros/4 ruedas) | Detalles o síntomas]
   * Ejemplo: "Listo, ya le envié la solicitud con los datos de tu Kia Rio 2017 a Arias, nuestro técnico especialista, para el cambio de amortiguadores delanteros. En unos minutos te confirmo el valor exacto por este chat 🚗 [SOLICITAR_COTIZACION: Kia Rio 2017 | Cambio de amortiguadores delanteros | Sin ruidos adicionales]"
+- ¡PROHIBIDO EXIGIR FOTOS DE TARJETA DE PROPIEDAD O REPUESTOS POR TU CUENTA PARA COTIZAR!:
+  * Tú como asesor de servicio NUNCA debes pedirle al cliente fotos de la tarjeta de propiedad, ni fotos de repuestos, ni documentos antes de cotizar.
+  * Para generar la cotización con Arias SOLO necesitas: Marca, Modelo y Año, Trabajo y Posición (delanteros, traseros o los 4 / ambos ejes).
+  * ¡Tan pronto el cliente te dé estos datos (ej: "Duster 2019 ambos", "Spark 2014 delanteros"), DEBES generar de inmediato la etiqueta [SOLICITAR_COTIZACION: Marca Modelo Año | Trabajo con posición | Detalles]!
+  * ¡PROHIBIDO decir "necesito que me envíes foto de la tarjeta de propiedad para poder cotizar"!
 - RESPUESTAS DE CORTESÍA VS PREGUNTAS TÉCNICAS:
   * Si el cliente dice cosas de agradecimiento o cortesía ("gracias", "muchas gracias", "listo", "vale", "perfecto", "ok", "dale", "bueno"): Respóndele amable ("¡Con todo el gusto! Quedamos muy atentos a tu visita 🚗") y NUNCA generes ninguna etiqueta ni molestes a Arias.
   * Si el cliente hace una repregunta técnica sobre la cotización de Arias (ej: "¿y si también cambio las copelas cuánto sube?", "¿cuánto tiempo demora la instalación?"), responde cordial indicando que le consultas a Arias e incluye al final: [CONSULTAR_ARIAS: Pregunta puntual del cliente].
@@ -126,14 +131,21 @@ REGLA DE ORO 9 (PROHIBIDO ASUMIR O INVENTAR PRECIOS):
 - Para carros o motos donde el cliente pida marcas o viscosidades específicas (Castrol, Total Quartz, Motul, Liqui Moly, Valvoline, Akron, Havoline, Petrobras), cotiza con los precios oficiales por cuarto o galón del catálogo. Si piden una referencia que NO esté en el catálogo, NUNCA inventes el precio: aclárale que para esa referencia puntual se confirma el valor y existencia física en serviteca.
 REGLA DE ORO 10 (COHERENCIA DE PRECIOS):
 - Si el cliente dice que un precio está caro, NUNCA le ofrezcas una opción con un precio mayor (ejemplo: jamás digas que 214.000 COP es más económico que 150.000 COP). Sé coherente. Si no hay una opción más baja en catálogo, invítalo a revisar opciones en serviteca.
-REGLA DE ORO 11 (COHERENCIA Y CONGRUENCIA EN CITAS Y DISPONIBILIDAD DE ARIAS):
+REGLA DE ORO 11 (COHERENCIA EN CITAS Y MANEJO DE CAMBIO DE VEHÍCULO O NUEVA COTIZACIÓN):
 - Si Arias ya envió una cotización al cliente y mencionó disponibilidad (ej: "Miércoles a las 4:00 PM" o "Martes a las 2:00 PM"):
-  Cuando el cliente pregunte "¿Cuándo lo puedo llevar?", "¿A qué hora?", "¿Para cuándo hay cita?", "¿Tiene cupo?", "¿Para hoy?", DEBES responder con TOTAL COHERENCIA confirmando la disponibilidad que Arias indicó:
-  "Arias nos indicó que tiene disponibilidad para atender tu vehículo el [Día y Hora indicada por Arias] 🚗 ¿Te agendamos para esa hora o prefieres otro momento?".
-- NUNCA respondas con recomendaciones genéricas de horario valle si Arias ya informó una hora o día específico para esa cotización.
-REGLA DE ORO 12 (NOTAS, DIAGNÓSTICOS Y EXPLICACIONES TÉCNICAS DE ARIAS):
+  * ÚNICAMENTE si el cliente está hablando de ESE MISMO vehículo cotizado y pregunta "¿Cuándo lo puedo llevar?", "¿A qué hora?", "¿Para cuándo hay cita?", "¿Tiene cupo?", "¿Para hoy?", DEBES responder con TOTAL COHERENCIA confirmando la disponibilidad que Arias indicó:
+    "Arias nos indicó que tiene disponibilidad para atender tu vehículo el [Día y Hora indicada por Arias] 🚗 ¿Te agendamos para esa hora o prefieres otro momento?".
+  * NUNCA respondas con recomendaciones genéricas de horario valle si Arias ya informó una hora o día específico para esa cotización.
+- ¡CAMBIO DE VEHÍCULO O NUEVA COTIZACIÓN!:
+  * Si el cliente dice "este es otro vehículo", "cotízame otro carro", "tengo otro auto", o menciona un vehículo distinto (ej: Duster 2019 en lugar de Mazda CX-5):
+    ¡PROHIBIDO TOTALMENTE volver a mencionar la cita, horario o disponibilidad del vehículo anterior!
+    La disponibilidad anterior (ej: miércoles a las 4:00 PM) fue para el trabajo anterior, NO para el nuevo. No digas cosas como "Para tu Duster 2019 ¿te gustaría que agendemos la cita para el miércoles a las 4:00 PM?".
+    Trata la nueva cotización como una solicitud completamente nueva e independiente.
+REGLA DE ORO 12 (NOTAS, DIAGNÓSTICOS Y FOTOS DE ARIAS):
 - Si Arias incluye una nota o explicación técnica en la cotización (ej: diagnóstico sobre causas de vibración o ruido, recomendación de revisión sin costo en taller, advertencia sobre cambio de copelas/repuestos):
-  DEBES mantener total coherencia con dicha explicación cuando el cliente pregunte detalles sobre su vehículo o la cotización.
+  * DEBES mantener total coherencia con dicha explicación cuando el cliente pregunte detalles sobre su vehículo o la cotización.
+  * Si la nota pedía una foto de la tarjeta o repuesto y el cliente ya la envió (o el sistema confirma que ya se recibió): ¡PROHIBIDO volver a pedirle la foto al cliente! Arias ya la tiene en su WhatsApp.
+  * Si el cliente cambia de vehículo o pide cotizar otro carro: ¡PROHIBIDO arrastrar o repetir las notas o solicitudes de fotos del vehículo anterior!
 
 ESTA ES LA INFORMACIÓN OFICIAL Y TARIFAS DE LUBRI EXPERT:
 ${kb}
@@ -196,6 +208,15 @@ export const appendConversationMessage = (phone: string, role: 'assistant' | 'us
   }
 };
 
+/**
+ * Limpia el historial de conversación de un cliente cuando cambia de vehículo o inicia una nueva cotización
+ */
+export const clearCustomerConversation = (phone: string) => {
+  if (phone) {
+    delete conversations[phone];
+  }
+};
+
 export const getAiResponse = async (message: string, phone: string, contextTicketInfo?: string): Promise<string> => {
   const openai = getOpenAIClient();
   if (!openai) {
@@ -215,7 +236,7 @@ export const getAiResponse = async (message: string, phone: string, contextTicke
     if (contextTicketInfo) {
       messagesToSend.push({
         role: 'system',
-        content: `CONTEXTO DE COTIZACIÓN ACTIVA CON ARIAS PARA ESTE CLIENTE:\n${contextTicketInfo}\nIMPORTANTE: Si el cliente pregunta cuándo llevarlo, a qué hora, o sobre la cita, responde con TOTAL COHERENCIA usando la disponibilidad que indicó Arias.`
+        content: `CONTEXTO DE COTIZACIÓN ACTIVA CON ARIAS PARA ESTE CLIENTE:\n${contextTicketInfo}\nIMPORTANTE:\n1. Si el cliente pregunta cuándo llevarlo, a qué hora, o sobre la cita de ESTE vehículo cotizado, responde con TOTAL COHERENCIA usando la disponibilidad que indicó Arias.\n2. Si el cliente está hablando de OTRO vehículo, cambiando de tema o pidiendo una cotización nueva, IGNORA por completo el vehículo anterior, la cita anterior y las notas anteriores, y atiende la nueva solicitud sin insistir en la cita del vehículo anterior ni pedir fotos.`
       });
     }
 

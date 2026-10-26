@@ -16,6 +16,7 @@ export interface QuoteTicket {
     quotePrice?: string;
     availability?: string | null;
     quoteNotes?: string;
+    photoReceived?: boolean;
     createdAt: number;
     updatedAt: number;
 }
@@ -380,11 +381,25 @@ class QuotesService {
                 const matchJid = customerJid && t.customerJid === customerJid;
                 const matchPhone = cleanPhone && (t.customerPhone === cleanPhone || t.customerPhone.endsWith(cleanPhone.slice(-10)));
                 const isRecent = (now - t.createdAt < 24 * 60 * 60 * 1000);
-                return (matchJid || matchPhone) && isRecent;
+                return (matchJid || matchPhone) && isRecent && t.status !== 'CLOSED';
             })
             .sort((a, b) => b.createdAt - a.createdAt);
 
         return customerTickets[0] || null;
+    }
+
+    /**
+     * Cierra un ticket activo para evitar loops o interferencias cuando el cliente cambia de vehículo
+     */
+    public closeTicket(ticketId: string, reason?: string): boolean {
+        if (this.tickets[ticketId]) {
+            this.tickets[ticketId].status = 'CLOSED';
+            this.tickets[ticketId].updatedAt = Date.now();
+            this.saveQuotes();
+            console.log(`[QUOTES] Ticket #${ticketId} cerrado. Motivo: ${reason || 'N/A'}`);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -444,11 +459,16 @@ class QuotesService {
             sent = await sendWhatsAppImage(targetArias, mediaPath, ariasCaption);
         }
 
+        ticket.photoReceived = true;
+        if (ticket.quoteNotes && /(foto|tarjeta|imagen|documento)/i.test(ticket.quoteNotes)) {
+            ticket.quoteNotes = 'Foto de la tarjeta de propiedad / repuesto ya recibida del cliente y reenviada a Arias.';
+        }
+
         if (sent?.key?.id) {
             ticket.mechanicMessageId = sent.key.id;
-            ticket.updatedAt = Date.now();
-            this.saveQuotes();
         }
+        ticket.updatedAt = Date.now();
+        this.saveQuotes();
 
         console.log(`[QUOTES] Foto/documento del ticket #${ticket.id} reenviada exitosamente a Arias (${targetArias})`);
         return true;
